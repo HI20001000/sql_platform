@@ -1,8 +1,22 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
 import { URL } from 'node:url'
-import createLogger from './scripts/logger.js'
-import createSqlAuditWrapper from './scripts/sqlAudit.js'
+let createLogger = null
+let createSqlAuditWrapper = null
+try {
+  createLogger = (await import('./scripts/logger.js')).default
+} catch {
+  createLogger = () => ({
+    info: (message) => console.log(message),
+    warn: (message) => console.warn(message),
+    error: (message) => console.error(message),
+  })
+}
+try {
+  createSqlAuditWrapper = (await import('./scripts/sqlAudit.js')).default
+} catch {
+  createSqlAuditWrapper = () => (connection) => connection
+}
 
 const loadEnvFile = async (path) => {
   let content = ''
