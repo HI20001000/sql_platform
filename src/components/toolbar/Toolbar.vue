@@ -1,8 +1,19 @@
+<script setup>
+import { onMounted } from 'vue'
+import { useUserInfo } from '../../scripts/useUserInfo.js'
+
+const { icon, iconBg, loadUserInfo } = useUserInfo()
+
+onMounted(() => {
+  loadUserInfo()
+})
+</script>
+
 <template>
   <aside class="toolbar" aria-label="工具欄">
     <div class="toolbar-section toolbar-section--top">
-      <div class="avatar" aria-label="用戶頭像">
-        <span class="avatar-icon">👤</span>
+      <div class="avatar" aria-label="用戶頭像" :style="{ background: iconBg }">
+        <span class="avatar-icon">{{ icon }}</span>
       </div>
     </div>
     <div class="toolbar-section toolbar-section--middle" aria-label="主要操作">
