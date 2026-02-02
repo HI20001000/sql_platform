@@ -240,6 +240,39 @@ useLoginAnimation({ heroRef, canvasRef })
   color: #64748b;
 }
 
+.tab-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: #f1f5f9;
+  border-radius: 14px;
+  padding: 0.35rem;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.tab {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+  border: none;
+  background: transparent;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab.active {
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
@@ -319,6 +352,39 @@ useLoginAnimation({ heroRef, canvasRef })
 .primary-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 18px 30px rgba(15, 23, 42, 0.25);
+}
+
+.secondary-button {
+  appearance: none;
+  min-width: 120px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.85rem;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.secondary-button:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.switch-text {
+  margin-top: 2rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.95rem;
 }
 
 .auth-message {
