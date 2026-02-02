@@ -46,77 +46,98 @@ useLoginAnimation({ heroRef, canvasRef })
         <p class="panel-subtitle">請輸入你的帳號資訊以繼續。</p>
       </header>
 
-      <form class="login-form" @submit.prevent="handleLogin">
-        <div class="form-grid">
-          <label class="field">
-            <span>電子郵件</span>
-            <input
-              v-model="loginEmail"
-              type="email"
-              placeholder="name@company.com"
-            />
-          </label>
+      <div class="tab-group">
+        <button
+          type="button"
+          :class="['tab', { active: activeTab === 'login' }]"
+          @click="switchTab('login')"
+        >
+          登入
+        </button>
+        <button
+          type="button"
+          :class="['tab', { active: activeTab === 'register' }]"
+          @click="switchTab('register')"
+        >
+          註冊
+        </button>
+      </div>
 
-          <label class="field">
-            <span>密碼</span>
-            <input v-model="loginPassword" type="password" placeholder="••••••••" />
-          </label>
-        </div>
+      <template v-if="activeTab === 'login'">
+        <form class="login-form" @submit.prevent="handleLogin">
+          <div class="form-grid">
+            <label class="field">
+              <span>電子郵件</span>
+              <input
+                v-model="loginEmail"
+                type="email"
+                placeholder="name@company.com"
+              />
+            </label>
 
-        <div class="helper-row">
-          <label class="checkbox">
-            <input v-model="rememberMe" type="checkbox" />
-            <span>記住我</span>
-          </label>
-          <a class="link" href="#">忘記密碼？</a>
-        </div>
+            <label class="field">
+              <span>密碼</span>
+              <input v-model="loginPassword" type="password" placeholder="••••••••" />
+            </label>
+          </div>
 
-        <button class="primary-button" type="submit">登入帳號</button>
-      </form>
+          <div class="helper-row">
+            <label class="checkbox">
+              <input v-model="rememberMe" type="checkbox" />
+              <span>記住我</span>
+            </label>
+            <a class="link" href="#">忘記密碼？</a>
+          </div>
 
-      <form
-        v-else
-        class="login-form"
-        @submit.prevent="handleRegister"
-      >
-        <div class="form-grid">
-          <label class="field">
-            <span>電子郵件</span>
-            <input
-              v-model="registerEmail"
-              type="email"
-              placeholder="name@company.com"
-            />
-          </label>
+          <button class="primary-button" type="submit">登入帳號</button>
+        </form>
+      </template>
 
-          <label class="field">
-            <span>密碼</span>
-            <input v-model="registerPassword" type="password" placeholder="••••••••" />
-          </label>
+      <template v-else>
+        <form class="login-form" @submit.prevent="handleRegister">
+          <div class="form-grid">
+            <label class="field">
+              <span>電子郵件</span>
+              <input
+                v-model="registerEmail"
+                type="email"
+                placeholder="name@company.com"
+              />
+            </label>
 
-          <label class="field">
-            <span>確認密碼</span>
-            <input v-model="registerPasswordConfirm" type="password" placeholder="再次輸入密碼" />
-          </label>
+            <label class="field">
+              <span>密碼</span>
+              <input v-model="registerPassword" type="password" placeholder="••••••••" />
+            </label>
 
-          <div class="field">
-            <span>郵件驗證</span>
-            <div class="code-row">
-              <input v-model="registerCode" type="text" placeholder="輸入驗證碼" />
-              <button
-                class="secondary-button"
-                type="button"
-                :disabled="resendCooldown > 0"
-                @click="requestCode"
-              >
-                {{ resendCooldown > 0 ? `再次發送 (${resendCooldown}s)` : '取得驗證碼' }}
-              </button>
+            <label class="field">
+              <span>確認密碼</span>
+              <input
+                v-model="registerPasswordConfirm"
+                type="password"
+                placeholder="再次輸入密碼"
+              />
+            </label>
+
+            <div class="field">
+              <span>郵件驗證</span>
+              <div class="code-row">
+                <input v-model="registerCode" type="text" placeholder="輸入驗證碼" />
+                <button
+                  class="secondary-button"
+                  type="button"
+                  :disabled="resendCooldown > 0"
+                  @click="requestCode"
+                >
+                  {{ resendCooldown > 0 ? `再次發送 (${resendCooldown}s)` : '取得驗證碼' }}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <button class="primary-button" type="submit">建立帳號</button>
-      </form>
+          <button class="primary-button" type="submit">建立帳號</button>
+        </form>
+      </template>
 
       <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
     </section>
