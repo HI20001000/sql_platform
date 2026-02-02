@@ -2,36 +2,22 @@
 import { getCurrentInstance, onMounted, onUnmounted, ref } from 'vue'
 import { apiBaseUrl } from '../scripts/apiBaseUrl.js'
 
-const activeTab = ref('login')
 const heroRef = ref(null)
 const canvasRef = ref(null)
 const router = getCurrentInstance().appContext.config.globalProperties.$router
 const loginEmail = ref('')
 const loginPassword = ref('')
 const rememberMe = ref(false)
-const registerEmail = ref('')
-const registerPassword = ref('')
-const registerPasswordConfirm = ref('')
-const registerCode = ref('')
 const authMessage = ref('')
-const resendCooldown = ref(0)
 const rememberEmailKey = 'innerai_remember_email'
-let resendTimer = null
+let cleanupAnimation = null
+
 const parseJsonSafe = async (response) => {
   try {
     return await response.json()
   } catch {
     return {}
   }
-}
-
-const clearAuthMessage = () => {
-  authMessage.value = ''
-}
-
-const switchTab = (tab) => {
-  activeTab.value = tab
-  clearAuthMessage()
 }
 
 const handleLogin = async () => {
@@ -65,90 +51,10 @@ const handleLogin = async () => {
     } else {
       window.localStorage.removeItem(rememberEmailKey)
     }
-    router?.push('/home')
+    router?.push('/blank')
   } catch (error) {
     console.error(error)
     authMessage.value = '登入失敗'
-  }
-}
-
-const requestCode = async () => {
-  authMessage.value = ''
-  if (!/^[^@]+@[^@]+\.[^@]+$/.test(registerEmail.value)) {
-    authMessage.value = '請輸入有效的電子郵件格式'
-    return
-  }
-  if (!registerPassword.value || !registerPasswordConfirm.value) {
-    authMessage.value = '請先填寫密碼與確認密碼'
-    return
-  }
-  if (resendCooldown.value > 0) {
-    return
-  }
-  try {
-    const response = await fetch(`${apiBaseUrl}/api/auth/request-code`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: registerEmail.value }),
-    })
-    const data = await parseJsonSafe(response)
-    if (!response.ok) {
-      authMessage.value = data.message || '無法發送驗證碼'
-      return
-    }
-    authMessage.value = '驗證碼已送出，60 秒內可再發送'
-    resendCooldown.value = 60
-    if (resendTimer) {
-      clearInterval(resendTimer)
-    }
-    resendTimer = window.setInterval(() => {
-      resendCooldown.value -= 1
-      if (resendCooldown.value <= 0) {
-        clearInterval(resendTimer)
-        resendTimer = null
-      }
-    }, 1000)
-  } catch (error) {
-    console.error(error)
-    authMessage.value = '無法發送驗證碼'
-  }
-}
-
-const handleRegister = async () => {
-  authMessage.value = ''
-  if (!/^[^@]+@[^@]+\.[^@]+$/.test(registerEmail.value)) {
-    authMessage.value = '請輸入有效的電子郵件格式'
-    return
-  }
-  if (!registerCode.value) {
-    authMessage.value = '請先輸入驗證碼'
-    return
-  }
-  if (registerPassword.value !== registerPasswordConfirm.value) {
-    authMessage.value = '密碼與確認密碼不一致'
-    return
-  }
-  try {
-    const response = await fetch(`${apiBaseUrl}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: registerEmail.value,
-        password: registerPassword.value,
-        code: registerCode.value,
-      }),
-    })
-    const data = await parseJsonSafe(response)
-    if (!response.ok) {
-      authMessage.value = data.message || '註冊失敗'
-      return
-    }
-    authMessage.value = '註冊成功，請登入'
-    loginEmail.value = registerEmail.value
-    activeTab.value = 'login'
-  } catch (error) {
-    console.error(error)
-    authMessage.value = '註冊失敗'
   }
 }
 
@@ -203,8 +109,6 @@ const createParticle = (width, height, { edge = false } = {}) => {
 
 const createParticles = (count, width, height) =>
   Array.from({ length: count }, () => createParticle(width, height))
-
-let cleanupAnimation = null
 
 onMounted(() => {
   const rememberedEmail = window.localStorage.getItem(rememberEmailKey)
@@ -262,7 +166,6 @@ onMounted(() => {
     mouse.x = event.clientX
     mouse.y = event.clientY
     mouse.active = true
-
   }
 
   const handleMouseLeave = () => {
@@ -397,10 +300,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (resendTimer) {
-    clearInterval(resendTimer)
-    resendTimer = null
-  }
   cleanupAnimation?.()
 })
 </script>
@@ -412,46 +311,19 @@ onUnmounted(() => {
       <div class="hero-content">
         <div class="hero-title-row">
           <img class="logo-image" src="/src/imgs/web_icon.png" alt="InnerAI" />
-          <p class="hero-title">AI業務_工作平台_v1.0</p>
+          <p class="hero-title">AI 業務平台</p>
         </div>
-        <p class="hero-subtitle">以「任務、會議、跟進」為核心的協作管理系統，整合以下能力：</p>
-        <ul class="hero-list">
-          <li>在「新增任務」建立任務（含跟進內容）</li>
-          <li>在「首頁」追蹤當日時間線與待辦</li>
-          <li>指派跟進人並更新狀態</li>
-          <li>在「上傳會議記錄」整理資料</li>
-        </ul>
+        <p class="hero-subtitle">請使用您的帳號登入系統。</p>
       </div>
     </aside>
 
     <section class="login-panel">
       <header class="panel-header">
-        <p class="panel-title">{{ activeTab === 'login' ? '歡迎回來' : '建立新帳號' }}</p>
+        <p class="panel-title">歡迎回來</p>
         <p class="panel-subtitle">請輸入你的帳號資訊以繼續。</p>
       </header>
 
-      <div class="tab-group">
-        <button
-          type="button"
-          :class="['tab', { active: activeTab === 'login' }]"
-          @click="switchTab('login')"
-        >
-          登入
-        </button>
-        <button
-          type="button"
-          :class="['tab', { active: activeTab === 'register' }]"
-          @click="switchTab('register')"
-        >
-          註冊
-        </button>
-      </div>
-
-      <form
-        v-if="activeTab === 'login'"
-        class="login-form"
-        @submit.prevent="handleLogin"
-      >
+      <form class="login-form" @submit.prevent="handleLogin">
         <div class="form-grid">
           <label class="field">
             <span>電子郵件</span>
@@ -468,7 +340,7 @@ onUnmounted(() => {
           </label>
         </div>
 
-        <div class="helper-row" v-if="activeTab === 'login'">
+        <div class="helper-row">
           <label class="checkbox">
             <input v-model="rememberMe" type="checkbox" />
             <span>記住我</span>
@@ -477,65 +349,9 @@ onUnmounted(() => {
         </div>
 
         <button class="primary-button" type="submit">登入帳號</button>
-
-      </form>
-
-      <form
-        v-else
-        class="login-form"
-        @submit.prevent="handleRegister"
-      >
-        <div class="form-grid">
-          <label class="field">
-            <span>電子郵件</span>
-            <input
-              v-model="registerEmail"
-              type="email"
-              placeholder="name@company.com"
-            />
-          </label>
-
-          <label class="field">
-            <span>密碼</span>
-            <input v-model="registerPassword" type="password" placeholder="••••••••" />
-          </label>
-
-          <label class="field">
-            <span>確認密碼</span>
-            <input v-model="registerPasswordConfirm" type="password" placeholder="再次輸入密碼" />
-          </label>
-
-          <div class="field">
-            <span>郵件驗證</span>
-            <div class="code-row">
-              <input v-model="registerCode" type="text" placeholder="輸入驗證碼" />
-              <button
-                class="secondary-button"
-                type="button"
-                :disabled="resendCooldown > 0"
-                @click="requestCode"
-              >
-                {{ resendCooldown > 0 ? `再次發送 (${resendCooldown}s)` : '取得驗證碼' }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <button class="primary-button" type="submit">建立帳號</button>
       </form>
 
       <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
-
-      <p class="switch-text">
-        {{ activeTab === 'login' ? '還沒有帳號？' : '已經有帳號？' }}
-        <button
-          class="link-button"
-          type="button"
-          @click="switchTab(activeTab === 'login' ? 'register' : 'login')"
-        >
-          {{ activeTab === 'login' ? '免費註冊' : '立即登入' }}
-        </button>
-      </p>
     </section>
   </div>
 </template>
@@ -604,16 +420,6 @@ onUnmounted(() => {
   line-height: 1.6;
 }
 
-.hero-list {
-  margin: 0;
-  padding-left: 1.25rem;
-  color: rgba(255, 255, 255, 0.75);
-  display: grid;
-  gap: 0.6rem;
-  font-size: 0.95rem;
-}
-
-
 .login-panel {
   background: #ffffff;
   padding: 4.5rem 10vw;
@@ -635,33 +441,6 @@ onUnmounted(() => {
 .panel-subtitle {
   margin: 0.5rem 0 0;
   color: #64748b;
-}
-
-.tab-group {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  background: #f1f5f9;
-  border-radius: 14px;
-  padding: 0.35rem;
-  margin-bottom: 2rem;
-  border: 1px solid rgba(148, 163, 184, 0.15);
-}
-
-.tab {
-  border: none;
-  background: transparent;
-  padding: 0.7rem 1rem;
-  border-radius: 12px;
-  font-weight: 600;
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tab.active {
-  background: #ffffff;
-  color: #111827;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
 }
 
 .login-form {
@@ -699,13 +478,6 @@ onUnmounted(() => {
 
 .field input::placeholder {
   color: #94a3b8;
-}
-
-.code-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.8rem;
-  align-items: center;
 }
 
 .field input:focus {
@@ -752,51 +524,11 @@ onUnmounted(() => {
   box-shadow: 0 18px 30px rgba(15, 23, 42, 0.25);
 }
 
-.secondary-button {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 0.85rem;
-  background: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.secondary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.secondary-button:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-}
-
-.switch-text {
-  margin-top: 2rem;
-  text-align: center;
-  color: #6b7280;
-  font-size: 0.95rem;
-}
-
 .auth-message {
   margin-top: 1.5rem;
   text-align: center;
   color: #2563eb;
   font-weight: 500;
-}
-
-.link-button {
-  background: none;
-  border: none;
-  color: #5b8cff;
-  font-weight: 600;
-  cursor: pointer;
-  margin-left: 0.5rem;
 }
 
 @media (min-width: 960px) {
