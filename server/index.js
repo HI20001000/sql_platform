@@ -1,10 +1,15 @@
 import fs from 'node:fs/promises'
 import http from 'node:http'
-import mysql from 'mysql2/promise'
 import crypto from 'node:crypto'
 import { URL } from 'node:url'
 let createLogger = null
 let createSqlAuditWrapper = null
+let mysql = null
+try {
+  mysql = (await import('mysql2/promise')).default
+} catch {
+  mysql = null
+}
 try {
   createLogger = (await import('./scripts/logger.js')).default
 } catch {
@@ -78,6 +83,9 @@ const parseBody = async (req) => {
 }
 
 const createConnection = async (withDatabase = false) => {
+  if (!mysql) {
+    throw new Error('mysql2 module is not available; please install mysql2 before starting server.')
+  }
   const connection = await mysql.createConnection({
     host: MYSQL_HOST,
     port: Number(MYSQL_PORT),
