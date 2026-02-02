@@ -30,7 +30,6 @@ const getAuthState = () => {
 const enforceAuth = (path) => {
   const authed = Boolean(getAuthState())
   if (!authed && path !== '/') return '/'
-  if (authed && path === '/') return '/blank'
   if (!routes.has(path)) return authed ? '/blank' : '/'
   return path
 }
