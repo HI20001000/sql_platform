@@ -1,6 +1,4 @@
-import fs from 'node:fs/promises'
 import http from 'node:http'
-import mysql from 'mysql2/promise'
 import crypto from 'node:crypto'
 import { URL } from 'node:url'
 import createLogger from './scripts/logger.js'
@@ -314,7 +312,6 @@ const loginUser = async (req, res) => {
 }
 
 const start = async () => {
-  await getConnection()
   const port = process.env.PORT || 3001
   const server = http.createServer(async (req, res) => {
     withCors(res)
@@ -343,7 +340,7 @@ const start = async () => {
     sendJson(res, 404, { message: 'Not found' })
   })
   server.listen(port, () => {
-    logger.info(`Server listening on ${port}`)
+    console.log(`Server listening on ${port}`)
   })
 }
 

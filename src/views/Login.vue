@@ -34,46 +34,19 @@ useLoginAnimation({ heroRef, canvasRef })
       <div class="hero-content">
         <div class="hero-title-row">
           <img class="logo-image" src="/src/imgs/web_icon.png" alt="InnerAI" />
-          <p class="hero-title">AI業務_工作平台_v1.0</p>
+          <p class="hero-title">AI 業務平台</p>
         </div>
-        <p class="hero-subtitle">以「任務、會議、跟進」為核心的協作管理系統，整合以下能力：</p>
-        <ul class="hero-list">
-          <li>在「新增任務」建立任務（含跟進內容）</li>
-          <li>在「首頁」追蹤當日時間線與待辦</li>
-          <li>指派跟進人並更新狀態</li>
-          <li>在「上傳會議記錄」整理資料</li>
-        </ul>
+        <p class="hero-subtitle">請使用您的帳號登入系統。</p>
       </div>
     </aside>
 
     <section class="login-panel">
       <header class="panel-header">
-        <p class="panel-title">{{ activeTab === 'login' ? '歡迎回來' : '建立新帳號' }}</p>
+        <p class="panel-title">歡迎回來</p>
         <p class="panel-subtitle">請輸入你的帳號資訊以繼續。</p>
       </header>
 
-      <div class="tab-group">
-        <button
-          type="button"
-          :class="['tab', { active: activeTab === 'login' }]"
-          @click="switchTab('login')"
-        >
-          登入
-        </button>
-        <button
-          type="button"
-          :class="['tab', { active: activeTab === 'register' }]"
-          @click="switchTab('register')"
-        >
-          註冊
-        </button>
-      </div>
-
-      <form
-        v-if="activeTab === 'login'"
-        class="login-form"
-        @submit.prevent="handleLogin"
-      >
+      <form class="login-form" @submit.prevent="handleLogin">
         <div class="form-grid">
           <label class="field">
             <span>電子郵件</span>
@@ -90,7 +63,7 @@ useLoginAnimation({ heroRef, canvasRef })
           </label>
         </div>
 
-        <div class="helper-row" v-if="activeTab === 'login'">
+        <div class="helper-row">
           <label class="checkbox">
             <input v-model="rememberMe" type="checkbox" />
             <span>記住我</span>
@@ -146,17 +119,6 @@ useLoginAnimation({ heroRef, canvasRef })
       </form>
 
       <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
-
-      <p class="switch-text">
-        {{ activeTab === 'login' ? '還沒有帳號？' : '已經有帳號？' }}
-        <button
-          class="link-button"
-          type="button"
-          @click="switchTab(activeTab === 'login' ? 'register' : 'login')"
-        >
-          {{ activeTab === 'login' ? '免費註冊' : '立即登入' }}
-        </button>
-      </p>
     </section>
   </div>
 </template>
@@ -257,33 +219,6 @@ useLoginAnimation({ heroRef, canvasRef })
   color: #64748b;
 }
 
-.tab-group {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  background: #f1f5f9;
-  border-radius: 14px;
-  padding: 0.35rem;
-  margin-bottom: 2rem;
-  border: 1px solid rgba(148, 163, 184, 0.15);
-}
-
-.tab {
-  border: none;
-  background: transparent;
-  padding: 0.7rem 1rem;
-  border-radius: 12px;
-  font-weight: 600;
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tab.active {
-  background: #ffffff;
-  color: #111827;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-}
-
 .login-form {
   display: flex;
   flex-direction: column;
@@ -319,13 +254,6 @@ useLoginAnimation({ heroRef, canvasRef })
 
 .field input::placeholder {
   color: #94a3b8;
-}
-
-.code-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.8rem;
-  align-items: center;
 }
 
 .field input:focus {
@@ -372,51 +300,11 @@ useLoginAnimation({ heroRef, canvasRef })
   box-shadow: 0 18px 30px rgba(15, 23, 42, 0.25);
 }
 
-.secondary-button {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 0.85rem;
-  background: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.secondary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.secondary-button:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-}
-
-.switch-text {
-  margin-top: 2rem;
-  text-align: center;
-  color: #6b7280;
-  font-size: 0.95rem;
-}
-
 .auth-message {
   margin-top: 1.5rem;
   text-align: center;
   color: #2563eb;
   font-weight: 500;
-}
-
-.link-button {
-  background: none;
-  border: none;
-  color: #5b8cff;
-  font-weight: 600;
-  cursor: pointer;
-  margin-left: 0.5rem;
 }
 
 @media (min-width: 960px) {
