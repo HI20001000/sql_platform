@@ -1,8 +1,40 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
 import { URL } from 'node:url'
+import createLogger from './scripts/logger.js'
+import createSqlAuditWrapper from './scripts/sqlAudit.js'
 
+const loadEnvFile = async (path) => {
+  let content = ''
+  try {
+    content = await fs.readFile(path, 'utf8')
+  } catch {
+    return
+  }
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const [key, ...rest] = trimmed.split('=')
+    if (!key) continue
+    const value = rest.join('=').trim()
+    if (key && value && !process.env[key]) {
+      process.env[key] = value
+    }
+  }
+}
+
+await loadEnvFile(new URL('../.env', import.meta.url))
+
+const {
+  MYSQL_HOST = 'localhost',
+  MYSQL_PORT = '3306',
+  MYSQL_USER = 'root',
+  MYSQL_PASSWORD = '12345',
+} = process.env
+
+const DATABASE_NAME = 'aisql'
 const TOKEN_TTL_MS = 60 * 60 * 1000
+const logger = createLogger()
 
 const withCors = (res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -29,26 +61,254 @@ const parseBody = async (req) => {
   }
 }
 
-const createAuthToken = () => crypto.randomBytes(32).toString('hex')
+const createConnection = async (withDatabase = false) => {
+  const connection = await mysql.createConnection({
+    host: MYSQL_HOST,
+    port: Number(MYSQL_PORT),
+    user: MYSQL_USER,
+    password: MYSQL_PASSWORD,
+    database: withDatabase ? DATABASE_NAME : undefined,
+  })
+  return connection
+}
+
+const ensureDatabase = async () => {
+  const connection = await createConnection(false)
+  await connection.query(`CREATE DATABASE IF NOT EXISTS \`${DATABASE_NAME}\``)
+  await connection.end()
+}
+
+const ensureTables = async (connection) => {
+  await connection.query(`CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    mail VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    password_salt VARCHAR(255) NOT NULL,
+    icon VARCHAR(16) NOT NULL DEFAULT '🙂',
+    icon_bg VARCHAR(32) NOT NULL DEFAULT '#e2e8f0',
+    username VARCHAR(255) NOT NULL DEFAULT 'hi',
+    role VARCHAR(50) NOT NULL DEFAULT 'normal',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`)
+  await connection.query(`CREATE TABLE IF NOT EXISTS auth_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    mail VARCHAR(255) NOT NULL,
+    token_hash VARCHAR(128) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`)
+}
+
+const seedDefaultUser = async (connection) => {
+  const [rows] = await connection.query('SELECT COUNT(*) as count FROM users')
+  if ((rows[0]?.count ?? 0) > 0) return
+  const email = 'admin@innerai.local'
+  const password = 'admin1234'
+  const salt = crypto.randomBytes(16).toString('hex')
+  const passwordHash = await hashPassword(password, salt)
+  await connection.query(
+    'INSERT INTO users (mail, password_hash, password_salt, icon, icon_bg, username, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [email, passwordHash, salt, '🙂', '#e2e8f0', 'admin', 'admin']
+  )
+  await logger.info(`Seeded default user: ${email}`)
+}
+
+const initDatabase = async () => {
+  await ensureDatabase()
+  const connection = await createConnection(true)
+  await ensureTables(connection)
+  await seedDefaultUser(connection)
+  return connection
+}
+
+let dbConnection = null
+const verificationCodes = new Map()
+
+const getConnection = async () => {
+  if (!dbConnection) {
+    dbConnection = await initDatabase()
+    return dbConnection
+  }
+  try {
+    await dbConnection.ping()
+  } catch (error) {
+    try {
+      await dbConnection.end()
+    } catch (closeError) {
+      // ignore
+    }
+    dbConnection = await initDatabase()
+  }
+  return dbConnection
+}
+
+const normalizeIp = (ip) => {
+  if (!ip) return 'unknown'
+  let normalized = ip.trim()
+  if (normalized === '::1') return '127.0.0.1'
+  if (normalized.startsWith('::ffff:')) {
+    normalized = normalized.slice(7)
+  }
+  if (normalized.includes('.') && normalized.includes(':')) {
+    const lastColon = normalized.lastIndexOf(':')
+    const maybePort = normalized.slice(lastColon + 1)
+    if (/^\d+$/.test(maybePort)) {
+      normalized = normalized.slice(0, lastColon)
+    }
+  }
+  return normalized
+}
+
+const getClientIp = (req) => {
+  const forwarded = req.headers['x-forwarded-for']
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return normalizeIp(forwarded.split(',')[0].trim())
+  }
+  const realIp = req.headers['x-real-ip']
+  if (typeof realIp === 'string' && realIp.trim()) {
+    return normalizeIp(realIp)
+  }
+  return normalizeIp(req.socket?.remoteAddress)
+}
+
+const wrapConnectionWithSqlLogging = createSqlAuditWrapper({ logger, getClientIp })
+
+const getRequestConnection = async (req) =>
+  req ? wrapConnectionWithSqlLogging(await getConnection(), req) : getConnection()
+
+const hashPassword = async (password, salt) => {
+  return new Promise((resolve, reject) => {
+    crypto.pbkdf2(password, salt, 100000, 64, 'sha512', (error, derivedKey) => {
+      if (error) {
+        reject(error)
+        return
+      }
+      resolve(derivedKey.toString('hex'))
+    })
+  })
+}
+
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex')
+
+const createAuthToken = async (email, req) => {
+  const token = crypto.randomBytes(32).toString('hex')
+  const tokenHash = hashToken(token)
+  const expiresAt = new Date(Date.now() + TOKEN_TTL_MS)
+  const connection = await getRequestConnection(req)
+  await connection.query('DELETE FROM auth_tokens WHERE mail = ? OR expires_at < NOW()', [email])
+  await connection.query('INSERT INTO auth_tokens (mail, token_hash, expires_at) VALUES (?, ?, ?)', [
+    email,
+    tokenHash,
+    expiresAt,
+  ])
+  return { token, expiresAt: expiresAt.toISOString() }
+}
+
+const requestVerificationCode = async (req, res) => {
+  const body = await parseBody(req)
+  const email = body?.email?.trim()
+  if (!email) {
+    sendJson(res, 400, { message: 'Email is required' })
+    return
+  }
+  await logger.info(`Verification code request received for ${email}`)
+  const existing = verificationCodes.get(email)
+  const now = Date.now()
+  if (existing?.lastSentAt && now - existing.lastSentAt < 60 * 1000) {
+    const waitSeconds = Math.ceil((60 * 1000 - (now - existing.lastSentAt)) / 1000)
+    sendJson(res, 429, { message: `請${waitSeconds}秒後再試` })
+    return
+  }
+  const code = Math.floor(1000 + Math.random() * 9000).toString()
+  const expiresAt = now + 60 * 1000
+  verificationCodes.set(email, { code, expiresAt, lastSentAt: now })
+  await logger.info(`Verification code for ${email}: ${code}`)
+  sendJson(res, 200, { message: 'Verification code sent' })
+}
+
+const registerUser = async (req, res) => {
+  const body = await parseBody(req)
+  const email = body?.email?.trim()
+  const password = body?.password
+  const code = body?.code?.trim()
+  if (!email || !password || !code) {
+    sendJson(res, 400, { message: 'Email, password, and code are required' })
+    return
+  }
+  const record = verificationCodes.get(email)
+  if (!record || record.expiresAt < Date.now() || record.code !== code) {
+    sendJson(res, 400, { message: 'Verification code is invalid or expired' })
+    return
+  }
+  try {
+    const salt = crypto.randomBytes(16).toString('hex')
+    const passwordHash = await hashPassword(password, salt)
+    const connection = await getRequestConnection(req)
+    const username = email.split('@')[0] || 'hi'
+    await connection.query(
+      'INSERT INTO users (mail, password_hash, password_salt, icon, icon_bg, username, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [email, passwordHash, salt, '🙂', '#e2e8f0', username, 'normal']
+    )
+    verificationCodes.delete(email)
+    await logger.info(`User registered: ${email}`)
+    sendJson(res, 201, { message: 'User registered' })
+  } catch (error) {
+    if (error?.code === 'ER_DUP_ENTRY') {
+      sendJson(res, 409, { message: 'Email already registered' })
+      return
+    }
+    await logger.error(`Register failed for ${email}: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to register' })
+  }
+}
 
 const loginUser = async (req, res) => {
   const body = await parseBody(req)
   const email = body?.email?.trim()
   const password = body?.password
+  const clientIp = getClientIp(req)
   if (!email || !password) {
+    await logger.warn(`Login failed from ${clientIp}: missing credentials`)
     sendJson(res, 400, { message: 'Email and password are required' })
     return
   }
-  const expiresAt = new Date(Date.now() + TOKEN_TTL_MS).toISOString()
-  sendJson(res, 200, {
-    token: createAuthToken(),
-    expiresAt,
-    user: {
-      mail: email,
-      username: email.split('@')[0] || 'user',
-      role: 'normal',
-    },
-  })
+  try {
+    const connection = await getRequestConnection(req)
+    const [rows] = await connection.query(
+      'SELECT mail, password_hash, password_salt, icon, icon_bg, username, role FROM users WHERE mail = ? LIMIT 1',
+      [email]
+    )
+    const user = rows[0]
+    if (!user) {
+      await logger.warn(`Login failed from ${clientIp} for ${email}`)
+      sendJson(res, 401, { message: 'Invalid credentials' })
+      return
+    }
+    const passwordHash = await hashPassword(password, user.password_salt)
+    if (passwordHash !== user.password_hash) {
+      await logger.warn(`Login failed from ${clientIp} for ${email}`)
+      sendJson(res, 401, { message: 'Invalid credentials' })
+      return
+    }
+    const tokenData = await createAuthToken(user.mail, req)
+    sendJson(res, 200, {
+      token: tokenData.token,
+      expiresAt: tokenData.expiresAt,
+      user: {
+        mail: user.mail,
+        icon: user.icon,
+        icon_bg: user.icon_bg,
+        username: user.username,
+        role: user.role,
+      },
+    })
+    await logger.info(`Login success from ${clientIp} for ${user.mail}`)
+  } catch (error) {
+    await logger.error(
+      `Login error from ${clientIp} for ${email || 'unknown'}: ${error?.message || error}`
+    )
+    sendJson(res, 500, { message: 'Failed to login' })
+  }
 }
 
 const start = async () => {
@@ -65,6 +325,14 @@ const start = async () => {
       return
     }
     const url = new URL(req.url, `http://${req.headers.host}`)
+    if (url.pathname === '/api/auth/request-code' && req.method === 'POST') {
+      await requestVerificationCode(req, res)
+      return
+    }
+    if (url.pathname === '/api/auth/register' && req.method === 'POST') {
+      await registerUser(req, res)
+      return
+    }
     if (url.pathname === '/api/auth/login' && req.method === 'POST') {
       await loginUser(req, res)
       return
