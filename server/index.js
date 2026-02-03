@@ -1,6 +1,11 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
 import { URL } from 'node:url'
+import {
+  buildProjectTreeRows,
+  fetchTaskStepsByTaskId,
+  getConnection as getCreateProjectConnection,
+} from '../scripts/CreateProject/index.js'
 let createLogger = null
 let createSqlAuditWrapper = null
 let mysql = null
@@ -334,6 +339,38 @@ const loginUser = async (req, res) => {
   }
 }
 
+const fetchCreateProjectTree = async (req, res) => {
+  const body = await parseBody(req)
+  const q = body?.q?.trim() || ''
+  const status = body?.status || []
+  const assignee = body?.assignee || []
+  const includeEmpty = Boolean(body?.includeEmpty)
+  try {
+    const payload = await buildProjectTreeRows({ q, status, assignee, includeEmpty })
+    sendJson(res, 200, payload)
+  } catch (error) {
+    await logger.error(`CreateProject tree load failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to load project tree' })
+  }
+}
+
+const fetchTaskSteps = async (req, res) => {
+  const body = await parseBody(req)
+  const taskId = body?.taskId
+  if (!taskId) {
+    sendJson(res, 400, { message: 'taskId is required' })
+    return
+  }
+  try {
+    const connection = await getCreateProjectConnection()
+    const steps = await fetchTaskStepsByTaskId(connection, taskId)
+    sendJson(res, 200, { steps })
+  } catch (error) {
+    await logger.error(`Task steps load failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to load task steps' })
+  }
+}
+
 const start = async () => {
   const port = process.env.PORT || 3001
   const server = http.createServer(async (req, res) => {
@@ -358,6 +395,14 @@ const start = async () => {
     }
     if (url.pathname === '/api/auth/login' && req.method === 'POST') {
       await loginUser(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/tree' && req.method === 'POST') {
+      await fetchCreateProjectTree(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/task-steps' && req.method === 'POST') {
+      await fetchTaskSteps(req, res)
       return
     }
     sendJson(res, 404, { message: 'Not found' })
