@@ -1,29 +1,79 @@
 <script setup>
-import Toolbar from '../components/toolbar/Toolbar.vue'
+import TaskStepsModal from '../components/CreateProject/TaskStepsModal.vue'
+import { useProjectData } from '../scripts/CreateProject/useProjectData.js'
+
+const {
+  searchText,
+  filteredRows,
+  totalTasks,
+  activeTask,
+  openTaskSteps,
+  closeTaskSteps,
+} = useProjectData()
+
+const depthPadding = (depth) => `${depth * 24}px`
+const formatTypeLabel = (type) => {
+  switch (type) {
+    case 'project':
+      return 'Project'
+    case 'product':
+      return 'Product'
+    case 'task':
+      return 'Task'
+    default:
+      return ''
+  }
+}
 </script>
 
 <template>
-  <section class="create-project" aria-label="Create project">
-    <Toolbar />
-    <main class="content">
-      <header class="content-header">
-        <p class="eyebrow">新專案</p>
-        <h1>建立專案</h1>
-        <p class="subtitle">上傳檔案開始建立你的專案內容。</p>
-      </header>
+  <section class="create-project">
+    <div class="toolbar-row">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input
+          v-model="searchText"
+          class="search-input"
+          type="search"
+          placeholder="全局模糊搜尋"
+        />
+      </div>
+      <button class="filter-button" type="button">篩選</button>
+      <div class="task-count">任務總數：{{ totalTasks }}</div>
+    </div>
 
-      <section class="upload-card" aria-label="Upload files">
-        <div class="upload-icon" aria-hidden="true">📄</div>
-        <div>
-          <h2>上傳檔案</h2>
-          <p>支援拖曳或點擊選擇檔案。</p>
+    <div class="table">
+      <div class="table-row table-row--header">
+        <div>層級名稱</div>
+        <div>狀態</div>
+        <div>負責人</div>
+        <div>更新時間</div>
+        <div>建立時間</div>
+      </div>
+      <div
+        v-for="row in filteredRows"
+        :key="row.id"
+        class="table-row"
+        :class="{ clickable: row.type === 'task' }"
+        @click="row.type === 'task' ? openTaskSteps(row) : null"
+      >
+        <div class="name-cell">
+          <span class="type-tag">{{ formatTypeLabel(row.type) }}</span>
+          <span class="node-name" :style="{ paddingLeft: depthPadding(row.depth) }">
+            {{ row.name }}
+          </span>
         </div>
-        <label class="upload-action">
-          <span>選擇檔案</span>
-          <input type="file" class="upload-input" multiple />
-        </label>
-      </section>
-    </main>
+        <div class="status-cell">
+          <span v-if="row.status" class="status-pill">{{ row.status }}</span>
+          <span v-else class="status-muted">—</span>
+        </div>
+        <div>{{ row.ownerId || '—' }}</div>
+        <div>{{ row.updatedAt }}</div>
+        <div>{{ row.createdAt }}</div>
+      </div>
+    </div>
+
+    <TaskStepsModal :task="activeTask" @close="closeTaskSteps" />
   </section>
 </template>
 
@@ -31,88 +81,125 @@ import Toolbar from '../components/toolbar/Toolbar.vue'
 .create-project {
   min-height: 100vh;
   background: #f8fafc;
-  padding-left: 84px;
-}
-
-.content {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 3.5rem 1.5rem;
+  padding: 2.5rem 3rem;
   display: grid;
-  gap: 2rem;
+  gap: 1.5rem;
+  font-family: "Noto Sans TC", "Segoe UI", sans-serif;
 }
 
-.content-header h1 {
-  font-size: 2rem;
-  margin: 0.35rem 0;
+.toolbar-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  background: #ffffff;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #f1f5f9;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+}
+
+.search-input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-size: 0.95rem;
+}
+
+.search-input:focus {
+  outline: none;
+}
+
+.filter-button {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.task-count {
+  font-weight: 600;
   color: #0f172a;
 }
 
-.eyebrow {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #64748b;
-  margin: 0;
+.table {
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
 }
 
-.subtitle {
-  margin: 0;
+.table-row {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr;
+  gap: 1rem;
+  padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.table-row--header {
+  background: #f8fafc;
+  font-weight: 600;
   color: #475569;
 }
 
-.upload-card {
-  background: #ffffff;
-  border-radius: 20px;
-  padding: 2.5rem;
-  display: grid;
-  gap: 1.5rem;
-  border: 1px dashed #cbd5f5;
-  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
-  text-align: center;
-}
-
-.upload-card h2 {
-  margin: 0 0 0.4rem;
-  font-size: 1.4rem;
-  color: #0f172a;
-}
-
-.upload-card p {
-  margin: 0;
-  color: #64748b;
-}
-
-.upload-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
-  margin: 0 auto;
-  background: #e2e8f0;
-  display: grid;
-  place-items: center;
-  font-size: 1.8rem;
-}
-
-.upload-action {
-  justify-self: center;
-  background: #2563eb;
-  color: #ffffff;
-  padding: 0.75rem 1.75rem;
-  border-radius: 999px;
-  font-weight: 600;
+.table-row.clickable {
   cursor: pointer;
-  display: inline-flex;
+}
+
+.table-row.clickable:hover {
+  background: #f8fafc;
+}
+
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.type-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  background: #e2e8f0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}
+
+.node-name {
+  display: inline-block;
+}
+
+.status-cell {
+  display: flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.3);
 }
 
-.upload-action:hover {
-  background: #1d4ed8;
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-weight: 600;
 }
 
-.upload-input {
-  display: none;
+.status-muted {
+  color: #94a3b8;
 }
 </style>
