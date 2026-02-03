@@ -334,7 +334,10 @@ onMounted(() => {
         <div class="task-count">任務總數：{{ taskCount }}</div>
       </div>
 
-      <div class="table">
+      <div v-if="loading" class="state-card">資料載入中...</div>
+      <div v-else-if="error" class="state-card state-card--error">{{ error }}</div>
+      <div v-else-if="visibleRows.length === 0" class="state-card">目前沒有資料。</div>
+      <div v-else class="table">
         <div class="table-row table-row--header">
           <div>層級名稱</div>
           <div>狀態</div>
