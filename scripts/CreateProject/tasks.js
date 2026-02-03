@@ -49,3 +49,15 @@ export const fetchTasksWithParents = async (connection, { q, status, assignee } 
   )
   return rows
 }
+
+export const createTask = async (
+  connection,
+  { productId, title, currentStatus, createdBy, assigneeUserId }
+) => {
+  const [result] = await connection.query(
+    `INSERT INTO tasks (product_id, title, current_status, created_by, assignee_user_id)
+     VALUES (?, ?, ?, ?, ?)`,
+    [productId, title, currentStatus, createdBy, assigneeUserId ?? null]
+  )
+  return result.insertId
+}

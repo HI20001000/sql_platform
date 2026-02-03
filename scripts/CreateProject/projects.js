@@ -15,3 +15,11 @@ export const fetchProjects = async (connection, { q } = {}) => {
   )
   return rows
 }
+
+export const createProject = async (connection, { name, ownerMail }) => {
+  const [result] = await connection.query(
+    `INSERT INTO projects (name, owner_mail) VALUES (?, ?)`,
+    [name, ownerMail]
+  )
+  return result.insertId
+}

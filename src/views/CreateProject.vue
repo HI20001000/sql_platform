@@ -1,8 +1,15 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import AddNodeModal from '../components/CreateProject/AddNodeModal.vue'
 import TaskStepsModal from '../components/CreateProject/TaskStepsModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
-import { fetchProjectTree, fetchTaskSteps } from '../scripts/CreateProject/api.js'
+import {
+  createProduct,
+  createProject,
+  createTask,
+  fetchProjectTree,
+  fetchTaskSteps,
+} from '../scripts/CreateProject/api.js'
 
 const searchQuery = ref('')
 const statusInput = ref('')
@@ -20,6 +27,12 @@ const currentTask = ref(null)
 const stepsLoading = ref(false)
 const stepsError = ref('')
 const stepsData = ref([])
+
+const addModalVisible = ref(false)
+const addModalType = ref('project')
+const addModalParent = ref(null)
+const addModalLoading = ref(false)
+const addModalError = ref('')
 
 const parseTokens = (value) => {
   if (!value) return []
@@ -41,6 +54,29 @@ const hasActiveFilters = computed(
 
 const isExpanded = (id) => expandedMap.value.has(id)
 const canToggle = (row) => row.rowType !== 'task' && row.hasChildren
+
+const addModalConfig = computed(() => {
+  switch (addModalType.value) {
+    case 'product':
+      return {
+        title: '新增產品',
+        placeholder: '輸入產品名稱',
+        confirmLabel: '新增產品',
+      }
+    case 'task':
+      return {
+        title: '新增任務',
+        placeholder: '輸入任務標題',
+        confirmLabel: '新增任務',
+      }
+    default:
+      return {
+        title: '新增專案',
+        placeholder: '輸入專案名稱',
+        confirmLabel: '新增專案',
+      }
+  }
+})
 
 const visibleRows = computed(() => {
   if (!rows.value.length) return []
@@ -65,6 +101,16 @@ const visibleRows = computed(() => {
   walk('root')
   return output
 })
+
+const getCurrentUser = () => {
+  try {
+    const raw = window.localStorage.getItem('innerai_user')
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
 
 const formatTypeLabel = (type) => {
   switch (type) {
@@ -106,24 +152,105 @@ const resetExpandedMap = (data) => {
   expandedMap.value = next
 }
 
+const applyTreeResponse = (response, expandIds = []) => {
+  rows.value = response.rows || []
+  taskCount.value = response.taskCount || 0
+  resetExpandedMap(rows.value)
+  if (expandIds.length > 0) {
+    const next = new Set(expandedMap.value)
+    expandIds.forEach((id) => next.add(id))
+    expandedMap.value = next
+  }
+}
+
+const buildFilterPayload = () => ({
+  q: searchQuery.value.trim(),
+  status: statusFilters.value,
+  assignee: assigneeFilters.value,
+})
+
 const loadTree = async () => {
   loading.value = true
   error.value = ''
   try {
-    const response = await fetchProjectTree({
-      q: searchQuery.value.trim(),
-      status: statusFilters.value,
-      assignee: assigneeFilters.value,
-    })
-    rows.value = response.rows || []
-    taskCount.value = response.taskCount || 0
-    resetExpandedMap(rows.value)
+    const response = await fetchProjectTree(buildFilterPayload())
+    applyTreeResponse(response)
   } catch (err) {
     error.value = err?.message || '載入失敗'
     rows.value = []
     taskCount.value = 0
   } finally {
     loading.value = false
+  }
+}
+
+const openAddModal = ({ type, parent }) => {
+  addModalType.value = type
+  addModalParent.value = parent || null
+  addModalError.value = ''
+  addModalVisible.value = true
+}
+
+const closeAddModal = () => {
+  addModalVisible.value = false
+  addModalParent.value = null
+  addModalError.value = ''
+  addModalLoading.value = false
+}
+
+const handleAddSubmit = async (name) => {
+  addModalLoading.value = true
+  addModalError.value = ''
+  const user = getCurrentUser()
+  const ownerMail = user?.mail || 'system'
+  const createdBy = user?.username || user?.mail || 'system'
+  try {
+    let response = null
+    let expandIds = []
+    if (addModalType.value === 'project') {
+      response = await createProject({
+        name,
+        owner_mail: ownerMail,
+        ...buildFilterPayload(),
+      })
+    } else if (addModalType.value === 'product') {
+      const projectId = addModalParent.value?.id
+      response = await createProduct({
+        projectId,
+        name,
+        created_by: createdBy,
+        ...buildFilterPayload(),
+      })
+      if (projectId) expandIds = [projectId]
+    } else if (addModalType.value === 'task') {
+      const productId = addModalParent.value?.id
+      response = await createTask({
+        productId,
+        title: name,
+        current_status: 'todo',
+        created_by: createdBy,
+        assignee_user_id: user?.mail || null,
+        ...buildFilterPayload(),
+      })
+      const projectId = addModalParent.value?.parentId
+      expandIds = [productId, projectId].filter(Boolean)
+    }
+    if (response) {
+      applyTreeResponse(response, expandIds)
+    }
+    closeAddModal()
+  } catch (err) {
+    addModalError.value = err?.message || '新增失敗'
+  } finally {
+    addModalLoading.value = false
+  }
+}
+
+const handleRowAdd = (row) => {
+  if (row.rowType === 'project') {
+    openAddModal({ type: 'product', parent: row })
+  } else if (row.rowType === 'product') {
+    openAddModal({ type: 'task', parent: row })
   }
 }
 
@@ -169,6 +296,12 @@ onMounted(() => {
   <section class="create-project">
     <Toolbar />
     <div class="content">
+      <div class="add-bar">
+        <div class="add-bar__title">Project 管理</div>
+        <button class="add-project-button" type="button" @click="openAddModal({ type: 'project' })">
+          新增項目 / Add Project
+        </button>
+      </div>
       <div class="toolbar-row">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
@@ -239,6 +372,14 @@ onMounted(() => {
             >
               查看步驟
             </button>
+            <button
+              v-else
+              class="add-button"
+              type="button"
+              @click.stop="handleRowAdd(row)"
+            >
+              + 新增
+            </button>
           </div>
           <div class="status-cell">
             <span v-if="row.rowType === 'task'" class="status-pill">
@@ -261,6 +402,16 @@ onMounted(() => {
       :error="stepsError"
       @close="closeTaskSteps"
     />
+    <AddNodeModal
+      :visible="addModalVisible"
+      :title="addModalConfig.title"
+      :placeholder="addModalConfig.placeholder"
+      :confirm-label="addModalConfig.confirmLabel"
+      :loading="addModalLoading"
+      :error="addModalError"
+      @close="closeAddModal"
+      @submit="handleAddSubmit"
+    />
   </section>
 </template>
 
@@ -280,9 +431,36 @@ onMounted(() => {
   flex: 1;
   min-width: 0;
   padding: 2.5rem 3rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1.5rem;
   width: 100%;
+}
+
+.add-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.add-bar__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.add-project-button {
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .toolbar-row {
@@ -405,6 +583,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .toggle-button {
@@ -442,6 +621,10 @@ onMounted(() => {
 .node-name {
   display: inline-block;
   font-weight: 600;
+  margin-right: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .steps-button {
@@ -452,6 +635,24 @@ onMounted(() => {
   font-size: 0.75rem;
   color: #475569;
   cursor: pointer;
+}
+
+.add-button {
+  border: 1px dashed #cbd5f5;
+  background: #f8fafc;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: #475569;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.table-row:hover .add-button {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .status-cell {

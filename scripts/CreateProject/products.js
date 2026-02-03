@@ -22,3 +22,11 @@ export const fetchProducts = async (connection, { q, projectIds } = {}) => {
   )
   return rows
 }
+
+export const createProduct = async (connection, { projectId, name, createdBy }) => {
+  const [result] = await connection.query(
+    `INSERT INTO products (project_id, name, created_by) VALUES (?, ?, ?)`,
+    [projectId, name, createdBy]
+  )
+  return result.insertId
+}

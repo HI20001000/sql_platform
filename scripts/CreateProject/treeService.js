@@ -1,7 +1,7 @@
 import { getConnection } from './dbClient.js'
-import { fetchProjects } from './projects.js'
-import { fetchProducts } from './products.js'
-import { fetchTasksWithParents } from './tasks.js'
+import { createProject, fetchProjects } from './projects.js'
+import { createProduct, fetchProducts } from './products.js'
+import { createTask, fetchTasksWithParents } from './tasks.js'
 
 const normalizeArray = (value) => {
   if (!value) return []
@@ -171,4 +171,46 @@ export const buildProjectTreeRows = async ({ q, status, assignee, includeEmpty }
   })
 
   return { rows, taskCount: tasksById.size }
+}
+
+export const createProjectNode = async ({ name, ownerMail, q, status, assignee, includeEmpty }) => {
+  const connection = await getConnection()
+  await createProject(connection, { name, ownerMail })
+  return buildProjectTreeRows({ q, status, assignee, includeEmpty })
+}
+
+export const createProductNode = async ({
+  projectId,
+  name,
+  createdBy,
+  q,
+  status,
+  assignee,
+  includeEmpty,
+}) => {
+  const connection = await getConnection()
+  await createProduct(connection, { projectId, name, createdBy })
+  return buildProjectTreeRows({ q, status, assignee, includeEmpty })
+}
+
+export const createTaskNode = async ({
+  productId,
+  title,
+  currentStatus,
+  createdBy,
+  assigneeUserId,
+  q,
+  status,
+  assignee,
+  includeEmpty,
+}) => {
+  const connection = await getConnection()
+  await createTask(connection, {
+    productId,
+    title,
+    currentStatus,
+    createdBy,
+    assigneeUserId,
+  })
+  return buildProjectTreeRows({ q, status, assignee, includeEmpty })
 }
