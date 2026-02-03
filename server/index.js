@@ -1,6 +1,15 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
+import fs from 'node:fs/promises'
 import { URL } from 'node:url'
+import {
+  buildProjectTreeRows,
+  createProductNode,
+  createProjectNode,
+  createTaskNode,
+  fetchTaskStepsByTaskId,
+  getConnection as getCreateProjectConnection,
+} from '../scripts/CreateProject/index.js'
 let createLogger = null
 let createSqlAuditWrapper = null
 let mysql = null
@@ -50,9 +59,10 @@ const {
   MYSQL_PORT = '3306',
   MYSQL_USER = 'root',
   MYSQL_PASSWORD = '12345',
+  MYSQL_DATABASE = 'aisql',
 } = process.env
 
-const DATABASE_NAME = 'aisql'
+const DATABASE_NAME = MYSQL_DATABASE
 const TOKEN_TTL_MS = 60 * 60 * 1000
 const logger = createLogger()
 
@@ -334,6 +344,115 @@ const loginUser = async (req, res) => {
   }
 }
 
+const fetchCreateProjectTree = async (req, res) => {
+  const body = await parseBody(req)
+  const q = body?.q?.trim() || ''
+  const status = body?.status || []
+  const assignee = body?.assignee || []
+  const includeEmpty = body?.includeEmpty ?? true
+  try {
+    const payload = await buildProjectTreeRows({ q, status, assignee, includeEmpty })
+    sendJson(res, 200, payload)
+  } catch (error) {
+    await logger.error(`CreateProject tree load failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to load project tree' })
+  }
+}
+
+const fetchTaskSteps = async (req, res) => {
+  const body = await parseBody(req)
+  const taskId = body?.taskId
+  if (!taskId) {
+    sendJson(res, 400, { message: 'taskId is required' })
+    return
+  }
+  try {
+    const connection = await getCreateProjectConnection()
+    const steps = await fetchTaskStepsByTaskId(connection, taskId)
+    sendJson(res, 200, { steps })
+  } catch (error) {
+    await logger.error(`Task steps load failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to load task steps' })
+  }
+}
+
+const createProject = async (req, res) => {
+  const body = await parseBody(req)
+  const name = body?.name?.trim()
+  if (!name) {
+    sendJson(res, 400, { message: 'name is required' })
+    return
+  }
+  try {
+    const ownerMail = body?.owner_mail?.trim() || 'system'
+    const payload = await createProjectNode({
+      name,
+      ownerMail,
+      q: body?.q,
+      status: body?.status,
+      assignee: body?.assignee,
+      includeEmpty: body?.includeEmpty ?? true,
+    })
+    sendJson(res, 200, payload)
+  } catch (error) {
+    await logger.error(`Create project failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to create project' })
+  }
+}
+
+const createProduct = async (req, res) => {
+  const body = await parseBody(req)
+  const name = body?.name?.trim()
+  const projectId = body?.projectId
+  if (!name || !projectId) {
+    sendJson(res, 400, { message: 'projectId and name are required' })
+    return
+  }
+  try {
+    const createdBy = body?.created_by?.trim() || 'system'
+    const payload = await createProductNode({
+      projectId,
+      name,
+      createdBy,
+      q: body?.q,
+      status: body?.status,
+      assignee: body?.assignee,
+      includeEmpty: body?.includeEmpty ?? true,
+    })
+    sendJson(res, 200, payload)
+  } catch (error) {
+    await logger.error(`Create product failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to create product' })
+  }
+}
+
+const createTask = async (req, res) => {
+  const body = await parseBody(req)
+  const title = body?.title?.trim()
+  const productId = body?.productId
+  if (!title || !productId) {
+    sendJson(res, 400, { message: 'productId and title are required' })
+    return
+  }
+  try {
+    const payload = await createTaskNode({
+      productId,
+      title,
+      currentStatus: body?.current_status?.trim() || 'todo',
+      createdBy: body?.created_by?.trim() || 'system',
+      assigneeUserId: body?.assignee_user_id?.trim() || null,
+      q: body?.q,
+      status: body?.status,
+      assignee: body?.assignee,
+      includeEmpty: body?.includeEmpty ?? true,
+    })
+    sendJson(res, 200, payload)
+  } catch (error) {
+    await logger.error(`Create task failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to create task' })
+  }
+}
+
 const start = async () => {
   const port = process.env.PORT || 3001
   const server = http.createServer(async (req, res) => {
@@ -358,6 +477,26 @@ const start = async () => {
     }
     if (url.pathname === '/api/auth/login' && req.method === 'POST') {
       await loginUser(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/tree' && req.method === 'POST') {
+      await fetchCreateProjectTree(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/task-steps' && req.method === 'POST') {
+      await fetchTaskSteps(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/project' && req.method === 'POST') {
+      await createProject(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/product' && req.method === 'POST') {
+      await createProduct(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/task' && req.method === 'POST') {
+      await createTask(req, res)
       return
     }
     sendJson(res, 404, { message: 'Not found' })
