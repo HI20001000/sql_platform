@@ -34,21 +34,15 @@ useLoginAnimation({ heroRef, canvasRef })
       <div class="hero-content">
         <div class="hero-title-row">
           <img class="logo-image" src="/src/imgs/web_icon.png" alt="InnerAI" />
-          <p class="hero-title">AI業務_工作平台_v1.0</p>
+          <p class="hero-title">AI 業務平台</p>
         </div>
-        <p class="hero-subtitle">以「任務、會議、跟進」為核心的協作管理系統，整合以下能力：</p>
-        <ul class="hero-list">
-          <li>在「新增任務」建立任務（含跟進內容）</li>
-          <li>在「首頁」追蹤當日時間線與待辦</li>
-          <li>指派跟進人並更新狀態</li>
-          <li>在「上傳會議記錄」整理資料</li>
-        </ul>
+        <p class="hero-subtitle">請使用您的帳號登入系統。</p>
       </div>
     </aside>
 
     <section class="login-panel">
       <header class="panel-header">
-        <p class="panel-title">{{ activeTab === 'login' ? '歡迎回來' : '建立新帳號' }}</p>
+        <p class="panel-title">歡迎回來</p>
         <p class="panel-subtitle">請輸入你的帳號資訊以繼續。</p>
       </header>
 
@@ -146,17 +140,6 @@ useLoginAnimation({ heroRef, canvasRef })
       </template>
 
       <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
-
-      <p class="switch-text">
-        {{ activeTab === 'login' ? '還沒有帳號？' : '已經有帳號？' }}
-        <button
-          class="link-button"
-          type="button"
-          @click="switchTab(activeTab === 'login' ? 'register' : 'login')"
-        >
-          {{ activeTab === 'login' ? '免費註冊' : '立即登入' }}
-        </button>
-      </p>
     </section>
   </div>
 </template>
@@ -327,13 +310,6 @@ useLoginAnimation({ heroRef, canvasRef })
   color: #94a3b8;
 }
 
-.code-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.8rem;
-  align-items: center;
-}
-
 .field input:focus {
   outline: none;
   border-color: #5b8cff;
@@ -416,15 +392,6 @@ useLoginAnimation({ heroRef, canvasRef })
   text-align: center;
   color: #2563eb;
   font-weight: 500;
-}
-
-.link-button {
-  background: none;
-  border: none;
-  color: #5b8cff;
-  font-weight: 600;
-  cursor: pointer;
-  margin-left: 0.5rem;
 }
 
 @media (min-width: 960px) {
