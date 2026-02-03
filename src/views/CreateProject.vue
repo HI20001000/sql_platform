@@ -95,7 +95,7 @@ const normalizeRows = (data) => {
   normalized.forEach((row) => {
     if (row.parentId === row.id) {
       // Root cause note: product rows returned after creation sometimes self-reference
-      // parentId === id, forming a cycle that makes walk() recurse forever when expanded.
+      // parentId === id, forming a cycle that made the generic parent walk() recurse forever.
       row.parentId = null
     }
     const expectedLevel =
@@ -109,31 +109,60 @@ const normalizeRows = (data) => {
 
 const visibleRows = computed(() => {
   if (!rows.value.length) return []
-  const byParent = new Map()
+
+  const projects = rows.value.filter((row) => row.rowType === 'project')
+  const productsByProject = new Map()
+  const tasksByProduct = new Map()
+
   rows.value.forEach((row) => {
-    const key = row.parentId ?? 'root'
-    if (!byParent.has(key)) byParent.set(key, [])
-    byParent.get(key).push(row)
+    if (row.rowType === 'product') {
+      const key = row.parentId ?? 'root'
+      if (!productsByProject.has(key)) productsByProject.set(key, [])
+      productsByProject.get(key).push(row)
+    } else if (row.rowType === 'task') {
+      const key = row.parentId ?? 'root'
+      if (!tasksByProduct.has(key)) tasksByProduct.set(key, [])
+      tasksByProduct.get(key).push(row)
+    }
   })
 
   const output = []
   const visited = new Set()
-  const walk = (parentKey, depth = 0) => {
-    // Cycle guard + depth limit to avoid stack overflow on malformed data.
+  const walkTasks = (productId, depth) => {
     if (depth > MAX_TREE_DEPTH) return
-    const children = byParent.get(parentKey) || []
-    children.forEach((child) => {
-      const nodeKey = `${child.rowType}:${child.id}`
+    const tasks = tasksByProduct.get(productId) || []
+    tasks.forEach((task) => {
+      const nodeKey = `${task.rowType}:${task.id}`
       if (visited.has(nodeKey)) return
       visited.add(nodeKey)
-      output.push(child)
-      if (expandedMap.value.has(child.id)) {
-        walk(child.id, depth + 1)
+      output.push(task)
+    })
+  }
+
+  const walkProducts = (projectId, depth) => {
+    if (depth > MAX_TREE_DEPTH) return
+    const products = productsByProject.get(projectId) || []
+    products.forEach((product) => {
+      const nodeKey = `${product.rowType}:${product.id}`
+      if (visited.has(nodeKey)) return
+      visited.add(nodeKey)
+      output.push(product)
+      if (expandedMap.value.has(product.id)) {
+        walkTasks(product.id, depth + 1)
       }
     })
   }
 
-  walk('root')
+  projects.forEach((project) => {
+    const nodeKey = `${project.rowType}:${project.id}`
+    if (visited.has(nodeKey)) return
+    visited.add(nodeKey)
+    output.push(project)
+    if (expandedMap.value.has(project.id)) {
+      walkProducts(project.id, 1)
+    }
+  })
+
   return output
 })
 
