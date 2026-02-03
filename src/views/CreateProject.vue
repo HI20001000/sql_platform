@@ -18,11 +18,11 @@ const depthPadding = (depth) => `${depth * 24}px`
 const formatTypeLabel = (type) => {
   switch (type) {
     case 'project':
-      return 'Project'
+      return '📁'
     case 'product':
-      return 'Product'
+      return '📦'
     case 'task':
-      return 'Task'
+      return '✅'
     default:
       return ''
   }
@@ -98,8 +98,8 @@ const canToggle = (row) => row.type !== 'task'
 .create-project {
   min-height: 100vh;
   background: #f8fafc;
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
+  display: flex;
+  width: 100vw;
   font-family: "Noto Sans TC", "Segoe UI", sans-serif;
   --project-color: #1d4ed8;
   --product-color: #0f766e;
@@ -107,6 +107,8 @@ const canToggle = (row) => row.type !== 'task'
 }
 
 .content {
+  flex: 1;
+  min-width: 0;
   padding: 2.5rem 3rem;
   display: grid;
   gap: 1.5rem;
@@ -163,6 +165,7 @@ const canToggle = (row) => row.type !== 'task'
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+  color: #1f2937;
 }
 
 .table-row {
@@ -173,6 +176,16 @@ const canToggle = (row) => row.type !== 'task'
   border-bottom: 1px solid #f1f5f9;
   align-items: center;
   font-size: 0.95rem;
+}
+
+.table-row > div {
+  border-right: 1px solid #e2e8f0;
+  padding-right: 1rem;
+}
+
+.table-row > div:last-child {
+  border-right: none;
+  padding-right: 0;
 }
 
 .table-row--header {
