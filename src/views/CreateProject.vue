@@ -18,13 +18,13 @@ const depthPadding = (depth) => `${depth * 24}px`
 const formatTypeLabel = (type) => {
   switch (type) {
     case 'project':
-      return '📁'
+      return '📚'
     case 'product':
       return '📦'
     case 'task':
-      return '✅'
+      return '📋'
     default:
-      return ''
+      return '⚠️'
   }
 }
 
@@ -205,7 +205,6 @@ const canToggle = (row) => row.type !== 'task'
 .name-cell {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
 }
 
 .toggle-button {
@@ -217,12 +216,13 @@ const canToggle = (row) => row.type !== 'task'
 }
 
 .type-tag {
-  font-size: 0.75rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: #0f172a;
   background: #e2e8f0;
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
+  padding: 0.1rem 0.1rem;
+  border-radius: 0.5rem;
+  margin-right: 0.5rem;
 }
 
 .type-tag--project {
