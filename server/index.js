@@ -1,5 +1,6 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
+import fs from 'node:fs/promises'
 import { URL } from 'node:url'
 import {
   buildProjectTreeRows,
@@ -55,9 +56,10 @@ const {
   MYSQL_PORT = '3306',
   MYSQL_USER = 'root',
   MYSQL_PASSWORD = '12345',
+  MYSQL_DATABASE = 'aisql',
 } = process.env
 
-const DATABASE_NAME = 'aisql'
+const DATABASE_NAME = MYSQL_DATABASE
 const TOKEN_TTL_MS = 60 * 60 * 1000
 const logger = createLogger()
 
