@@ -1,10 +1,12 @@
 import { h, shallowRef } from 'vue'
 import LoginView from '../views/Login.vue'
 import BlankView from '../views/Blank.vue'
+import CreateProjectView from '../views/CreateProject.vue'
 
 const routeRecords = [
   { path: '/', name: 'login', component: LoginView },
   { path: '/blank', name: 'blank', component: BlankView },
+  { path: '/projects/create', name: 'create-project', component: CreateProjectView },
 ]
 
 const routes = new Map(routeRecords.map((route) => [route.path, route.component]))
