@@ -36,7 +36,6 @@ const handleCreateProject = () => {
 
 <style scoped>
 .toolbar {
-  position: fixed;
   inset: 0 auto 0 0;
   width: 84px;
   background: #0f172a;
