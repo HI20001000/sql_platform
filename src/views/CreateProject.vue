@@ -466,6 +466,7 @@ onMounted(() => {
               >
                 {{ isExpanded(row.id) ? '▾' : '▸' }}
               </button>
+              <span v-else class="toggle-spacer" aria-hidden="true"></span>
               <span class="type-tag" :class="`type-tag--${row.rowType}`">
                 {{ formatTypeLabel(row.rowType) }}
               </span>
@@ -693,6 +694,12 @@ onMounted(() => {
   font-size: 1rem;
   color: #64748b;
   cursor: pointer;
+}
+
+.toggle-spacer {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
 }
 
 .type-tag {
