@@ -78,27 +78,91 @@ const addModalConfig = computed(() => {
   }
 })
 
+const MAX_TREE_DEPTH = 20
+
+const normalizeRows = (data) => {
+  const rawRows = Array.isArray(data) ? data : []
+  const normalized = rawRows.map((row) => ({ ...row }))
+  const childCounts = new Map()
+
+  normalized.forEach((row) => {
+    const parentId = row.parentId ?? null
+    if (parentId !== null && parentId !== undefined) {
+      childCounts.set(parentId, (childCounts.get(parentId) || 0) + 1)
+    }
+  })
+
+  normalized.forEach((row) => {
+    if (row.parentId === row.id) {
+      // Root cause note: product rows returned after creation sometimes self-reference
+      // parentId === id, forming a cycle that made the generic parent walk() recurse forever.
+      row.parentId = null
+    }
+    const expectedLevel =
+      row.rowType === 'project' ? 0 : row.rowType === 'product' ? 1 : row.rowType === 'task' ? 2 : row.level
+    row.level = expectedLevel
+    row.hasChildren = row.rowType !== 'task' && (childCounts.get(row.id) || 0) > 0
+  })
+
+  return normalized
+}
+
 const visibleRows = computed(() => {
   if (!rows.value.length) return []
-  const byParent = new Map()
+
+  const projects = rows.value.filter((row) => row.rowType === 'project')
+  const productsByProject = new Map()
+  const tasksByProduct = new Map()
+
   rows.value.forEach((row) => {
-    const key = row.parentId ?? 'root'
-    if (!byParent.has(key)) byParent.set(key, [])
-    byParent.get(key).push(row)
+    if (row.rowType === 'product') {
+      const key = row.parentId ?? 'root'
+      if (!productsByProject.has(key)) productsByProject.set(key, [])
+      productsByProject.get(key).push(row)
+    } else if (row.rowType === 'task') {
+      const key = row.parentId ?? 'root'
+      if (!tasksByProduct.has(key)) tasksByProduct.set(key, [])
+      tasksByProduct.get(key).push(row)
+    }
   })
 
   const output = []
-  const walk = (parentKey) => {
-    const children = byParent.get(parentKey) || []
-    children.forEach((child) => {
-      output.push(child)
-      if (expandedMap.value.has(child.id)) {
-        walk(child.id)
+  const visited = new Set()
+  const walkTasks = (productId, depth) => {
+    if (depth > MAX_TREE_DEPTH) return
+    const tasks = tasksByProduct.get(productId) || []
+    tasks.forEach((task) => {
+      const nodeKey = `${task.rowType}:${task.id}`
+      if (visited.has(nodeKey)) return
+      visited.add(nodeKey)
+      output.push(task)
+    })
+  }
+
+  const walkProducts = (projectId, depth) => {
+    if (depth > MAX_TREE_DEPTH) return
+    const products = productsByProject.get(projectId) || []
+    products.forEach((product) => {
+      const nodeKey = `${product.rowType}:${product.id}`
+      if (visited.has(nodeKey)) return
+      visited.add(nodeKey)
+      output.push(product)
+      if (expandedMap.value.has(product.id)) {
+        walkTasks(product.id, depth + 1)
       }
     })
   }
 
-  walk('root')
+  projects.forEach((project) => {
+    const nodeKey = `${project.rowType}:${project.id}`
+    if (visited.has(nodeKey)) return
+    visited.add(nodeKey)
+    output.push(project)
+    if (expandedMap.value.has(project.id)) {
+      walkProducts(project.id, 1)
+    }
+  })
+
   return output
 })
 
@@ -153,7 +217,7 @@ const resetExpandedMap = (data) => {
 }
 
 const applyTreeResponse = (response, expandIds = []) => {
-  rows.value = response.rows || []
+  rows.value = normalizeRows(response.rows || [])
   taskCount.value = response.taskCount || 0
   resetExpandedMap(rows.value)
   if (expandIds.length > 0) {
