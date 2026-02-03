@@ -716,6 +716,7 @@ onMounted(() => {
 }
 
 .type-tag--task {
+  margin-left:0.5rem;
   background: rgba(124, 58, 237, 0.12);
   color: var(--task-color);
 }
