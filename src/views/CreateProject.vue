@@ -65,7 +65,7 @@ const canToggle = (row) => row.type !== 'task'
           :class="{ clickable: row.type === 'task' }"
           @click="row.type === 'task' ? openTaskSteps(row) : null"
         >
-          <div class="name-cell">
+          <div class="name-cell" :style="{ paddingLeft: depthPadding(row.depth) }">
             <button
               v-if="canToggle(row)"
               class="toggle-button"
@@ -77,9 +77,7 @@ const canToggle = (row) => row.type !== 'task'
             <span class="type-tag" :class="`type-tag--${row.type}`">
               {{ formatTypeLabel(row.type) }}
             </span>
-            <span class="node-name" :style="{ paddingLeft: depthPadding(row.depth) }">
-              {{ row.name }}
-            </span>
+            <span class="node-name">{{ row.name }}</span>
           </div>
           <div class="status-cell">
             <span v-if="row.status" class="status-pill">{{ row.status }}</span>
@@ -101,7 +99,7 @@ const canToggle = (row) => row.type !== 'task'
   min-height: 100vh;
   background: #f8fafc;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 84px minmax(0, 1fr);
   font-family: "Noto Sans TC", "Segoe UI", sans-serif;
   --project-color: #1d4ed8;
   --product-color: #0f766e;
@@ -112,6 +110,7 @@ const canToggle = (row) => row.type !== 'task'
   padding: 2.5rem 3rem;
   display: grid;
   gap: 1.5rem;
+  width: 100%;
 }
 
 .toolbar-row {
