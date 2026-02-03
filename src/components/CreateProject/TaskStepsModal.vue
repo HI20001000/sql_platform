@@ -277,6 +277,8 @@ const handleSubmit = () => {
 .steps-grid {
   display: grid;
   gap: 0.75rem;
+  overflow: auto;
+  max-height: 300px;
 }
 
 .steps-row {
