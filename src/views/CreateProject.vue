@@ -98,8 +98,8 @@ const canToggle = (row) => row.type !== 'task'
 .create-project {
   min-height: 100vh;
   background: #f8fafc;
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
+  display: flex;
+  width: 100vw;
   font-family: "Noto Sans TC", "Segoe UI", sans-serif;
   --project-color: #1d4ed8;
   --product-color: #0f766e;
@@ -107,6 +107,8 @@ const canToggle = (row) => row.type !== 'task'
 }
 
 .content {
+  flex: 1;
+  min-width: 0;
   padding: 2.5rem 3rem;
   display: grid;
   gap: 1.5rem;
