@@ -7,6 +7,7 @@ import {
   createProduct,
   createProject,
   createTask,
+  createTaskStep,
   fetchProjectTree,
   fetchTaskSteps,
 } from '../scripts/CreateProject/api.js'
@@ -27,6 +28,8 @@ const currentTask = ref(null)
 const stepsLoading = ref(false)
 const stepsError = ref('')
 const stepsData = ref([])
+const stepSubmitLoading = ref(false)
+const stepSubmitError = ref('')
 
 const addModalVisible = ref(false)
 const addModalType = ref('project')
@@ -326,6 +329,7 @@ const openTaskSteps = async (row) => {
   stepsLoading.value = true
   stepsError.value = ''
   stepsData.value = []
+  stepSubmitError.value = ''
   try {
     const response = await fetchTaskSteps(row.id)
     stepsData.value = response.steps || []
@@ -342,6 +346,31 @@ const closeTaskSteps = () => {
   stepsData.value = []
   stepsError.value = ''
   stepsLoading.value = false
+  stepSubmitError.value = ''
+  stepSubmitLoading.value = false
+}
+
+const handleAddStep = async ({ content, status, assignee_user_id }) => {
+  if (!currentTask.value?.id) return
+  stepSubmitLoading.value = true
+  stepSubmitError.value = ''
+  const user = getCurrentUser()
+  try {
+    const response = await createTaskStep({
+      taskId: currentTask.value.id,
+      content,
+      status,
+      assignee_user_id,
+      created_by: user?.username || user?.mail || 'system',
+    })
+    if (response?.step) {
+      stepsData.value = [...stepsData.value, response.step]
+    }
+  } catch (err) {
+    stepSubmitError.value = err?.message || '新增步驟失敗'
+  } finally {
+    stepSubmitLoading.value = false
+  }
 }
 
 let debounceTimer = null
@@ -479,7 +508,10 @@ onMounted(() => {
       :steps="stepsData"
       :loading="stepsLoading"
       :error="stepsError"
+      :submit-loading="stepSubmitLoading"
+      :submit-error="stepSubmitError"
       @close="closeTaskSteps"
+      @submit="handleAddStep"
     />
     <AddNodeModal
       :visible="addModalVisible"

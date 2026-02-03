@@ -34,6 +34,22 @@ export const fetchTaskSteps = async (taskId) => {
   return response.json()
 }
 
+export const createTaskStep = async ({
+  taskId,
+  status,
+  content,
+  created_by,
+  assignee_user_id,
+}) => {
+  return requestJson(`${apiBaseUrl}/api/create-project/task-step`, {
+    taskId,
+    status,
+    content,
+    created_by,
+    assignee_user_id,
+  })
+}
+
 const requestJson = async (url, body) => {
   const response = await fetch(url, {
     method: 'POST',
