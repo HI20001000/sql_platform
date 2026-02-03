@@ -36,14 +36,12 @@ export const fetchTaskSteps = async (taskId) => {
 
 export const createTaskStep = async ({
   taskId,
-  status,
   content,
   created_by,
   assignee_user_id,
 }) => {
   return requestJson(`${apiBaseUrl}/api/create-project/task-step`, {
     taskId,
-    status,
     content,
     created_by,
     assignee_user_id,

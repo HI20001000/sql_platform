@@ -381,7 +381,6 @@ const addTaskStep = async (req, res) => {
   const body = await parseBody(req)
   const taskId = body?.taskId
   const content = body?.content?.trim()
-  const status = body?.status?.trim() || 'todo'
   if (!taskId || !content) {
     sendJson(res, 400, { message: 'taskId and content are required' })
     return
@@ -390,7 +389,6 @@ const addTaskStep = async (req, res) => {
     const connection = await getCreateProjectConnection()
     const step = await createTaskStep(connection, {
       taskId,
-      status,
       content,
       createdBy: body?.created_by?.trim() || 'system',
       assigneeUserId: body?.assignee_user_id?.trim() || null,

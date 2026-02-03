@@ -35,12 +35,10 @@ const props = defineProps({
 const emit = defineEmits(['close', 'submit'])
 
 const contentInput = ref('')
-const statusInput = ref('todo')
 const assigneeInput = ref('')
 
 const resetForm = () => {
   contentInput.value = ''
-  statusInput.value = 'todo'
   assigneeInput.value = ''
 }
 
@@ -58,7 +56,6 @@ const handleClose = () => {
 const handleSubmit = () => {
   emit('submit', {
     content: contentInput.value,
-    status: statusInput.value,
     assignee_user_id: assigneeInput.value.trim() || null,
   })
 }
@@ -108,14 +105,12 @@ const handleSubmit = () => {
         <div v-else-if="steps.length === 0" class="modal-state">目前沒有步驟資料。</div>
         <div v-else class="steps-grid">
           <div class="steps-row steps-row--head">
-            <span>狀態</span>
             <span>負責人</span>
             <span>內容</span>
             <span>建立者</span>
             <span>建立時間</span>
           </div>
           <div v-for="step in steps" :key="step.id" class="steps-row">
-            <span class="status-pill">{{ step.status || '-' }}</span>
             <span>{{ step.assignee_user_id ?? '-' }}</span>
             <span class="step-content">{{ step.content }}</span>
             <span>{{ step.created_by || '-' }}</span>
@@ -137,16 +132,10 @@ const handleSubmit = () => {
               {{ submitLoading ? '新增中...' : '新增步驟' }}
             </button>
           </div>
-          <div class="step-form__row">
-            <label class="step-form__field">
-              <span>狀態</span>
-              <input v-model="statusInput" type="text" placeholder="todo / doing / done" />
-            </label>
-            <label class="step-form__field">
-              <span>負責人</span>
-              <input v-model="assigneeInput" type="text" placeholder="assignee user id" />
-            </label>
-          </div>
+          <label class="step-form__field">
+            <span>負責人</span>
+            <input v-model="assigneeInput" type="text" placeholder="assignee user id" />
+          </label>
           <label class="step-form__field step-form__field--full">
             <span>內容</span>
             <textarea v-model="contentInput" rows="3" placeholder="輸入步驟內容"></textarea>
@@ -241,12 +230,6 @@ const handleSubmit = () => {
   color: #64748b;
 }
 
-.step-form__row {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .step-form__field {
   display: grid;
   gap: 0.4rem;
@@ -324,7 +307,7 @@ const handleSubmit = () => {
 
 .steps-row {
   display: grid;
-  grid-template-columns: 0.8fr 0.8fr 2fr 1fr 1fr;
+  grid-template-columns: 1fr 2.2fr 1fr 1fr;
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 0.5rem;

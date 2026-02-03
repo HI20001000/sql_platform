@@ -350,7 +350,7 @@ const closeTaskSteps = () => {
   stepSubmitLoading.value = false
 }
 
-const handleAddStep = async ({ content, status, assignee_user_id }) => {
+const handleAddStep = async ({ content, assignee_user_id }) => {
   if (!currentTask.value?.id) return
   stepSubmitLoading.value = true
   stepSubmitError.value = ''
@@ -359,7 +359,6 @@ const handleAddStep = async ({ content, status, assignee_user_id }) => {
     const response = await createTaskStep({
       taskId: currentTask.value.id,
       content,
-      status,
       assignee_user_id,
       created_by: user?.username || user?.mail || 'system',
     })
