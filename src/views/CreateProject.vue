@@ -167,6 +167,7 @@ const buildFilterPayload = () => ({
   q: searchQuery.value.trim(),
   status: statusFilters.value,
   assignee: assigneeFilters.value,
+  includeEmpty: true,
 })
 
 const loadTree = async () => {
@@ -344,53 +345,67 @@ onMounted(() => {
           <div>更新時間</div>
           <div>建立時間</div>
         </div>
-        <div
-          v-for="row in visibleRows"
-          :key="`${row.rowType}-${row.id}`"
-          class="table-row"
-          :class="{ clickable: row.rowType === 'task' }"
-          @click="row.rowType === 'task' ? openTaskSteps(row) : null"
-        >
-          <div class="name-cell" :style="{ paddingLeft: depthPadding(row.level) }">
-            <button
-              v-if="canToggle(row)"
-              class="toggle-button"
-              type="button"
-              @click.stop="toggleExpanded(row)"
-            >
-              {{ isExpanded(row.id) ? '▾' : '▸' }}
-            </button>
-            <span class="type-tag" :class="`type-tag--${row.rowType}`">
-              {{ formatTypeLabel(row.rowType) }}
-            </span>
-            <span class="node-name">{{ row.name }}</span>
-            <button
-              v-if="row.rowType === 'task'"
-              class="steps-button"
-              type="button"
-              @click.stop="openTaskSteps(row)"
-            >
-              查看步驟
-            </button>
-            <button
-              v-else
-              class="add-button"
-              type="button"
-              @click.stop="handleRowAdd(row)"
-            >
-              + 新增
-            </button>
-          </div>
-          <div class="status-cell">
-            <span v-if="row.rowType === 'task'" class="status-pill">
-              {{ row.status || '-' }}
-            </span>
-            <span v-else class="status-muted">-</span>
-          </div>
-          <div>{{ row.rowType === 'task' ? row.assignee_user_id ?? '-' : '-' }}</div>
-          <div>{{ row.updated_at }}</div>
-          <div>{{ row.created_at }}</div>
+        <div v-if="loading" class="table-row table-row--empty">
+          <div class="table-empty" :style="{ gridColumn: '1 / -1' }">資料載入中...</div>
         </div>
+        <div v-else-if="error" class="table-row table-row--empty">
+          <div class="table-empty" :style="{ gridColumn: '1 / -1' }">
+            <span>{{ error }}</span>
+            <button class="retry-button" type="button" @click="loadTree">重試</button>
+          </div>
+        </div>
+        <div v-else-if="visibleRows.length === 0" class="table-row table-row--empty">
+          <div class="table-empty" :style="{ gridColumn: '1 / -1' }">目前沒有資料。</div>
+        </div>
+        <template v-else>
+          <div
+            v-for="row in visibleRows"
+            :key="`${row.rowType}-${row.id}`"
+            class="table-row"
+            :class="{ clickable: row.rowType === 'task' }"
+            @click="row.rowType === 'task' ? openTaskSteps(row) : null"
+          >
+            <div class="name-cell" :style="{ paddingLeft: depthPadding(row.level) }">
+              <button
+                v-if="canToggle(row)"
+                class="toggle-button"
+                type="button"
+                @click.stop="toggleExpanded(row)"
+              >
+                {{ isExpanded(row.id) ? '▾' : '▸' }}
+              </button>
+              <span class="type-tag" :class="`type-tag--${row.rowType}`">
+                {{ formatTypeLabel(row.rowType) }}
+              </span>
+              <span class="node-name">{{ row.name }}</span>
+              <button
+                v-if="row.rowType === 'task'"
+                class="steps-button"
+                type="button"
+                @click.stop="openTaskSteps(row)"
+              >
+                查看步驟
+              </button>
+              <button
+                v-else
+                class="add-button"
+                type="button"
+                @click.stop="handleRowAdd(row)"
+              >
+                + 新增
+              </button>
+            </div>
+            <div class="status-cell">
+              <span v-if="row.rowType === 'task'" class="status-pill">
+                {{ row.status || '-' }}
+              </span>
+              <span v-else class="status-muted">-</span>
+            </div>
+            <div>{{ row.rowType === 'task' ? row.assignee_user_id ?? '-' : '-' }}</div>
+            <div>{{ row.updated_at }}</div>
+            <div>{{ row.created_at }}</div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -520,19 +535,6 @@ onMounted(() => {
   justify-self: end;
 }
 
-.state-card {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 1rem 1.5rem;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
-  color: #475569;
-}
-
-.state-card--error {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
 .table {
   background: #ffffff;
   border-radius: 12px;
@@ -550,6 +552,10 @@ onMounted(() => {
   border-bottom: 1px solid #f1f5f9;
   align-items: center;
   font-size: 0.95rem;
+}
+
+.table-row--empty {
+  background: #f8fafc;
 }
 
 .table-row > div {
@@ -634,6 +640,25 @@ onMounted(() => {
   border-radius: 999px;
   font-size: 0.75rem;
   color: #475569;
+  cursor: pointer;
+}
+
+.table-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: #64748b;
+  font-weight: 500;
+  padding: 1.2rem 0;
+}
+
+.retry-button {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
   cursor: pointer;
 }
 

@@ -349,7 +349,7 @@ const fetchCreateProjectTree = async (req, res) => {
   const q = body?.q?.trim() || ''
   const status = body?.status || []
   const assignee = body?.assignee || []
-  const includeEmpty = Boolean(body?.includeEmpty)
+  const includeEmpty = body?.includeEmpty ?? true
   try {
     const payload = await buildProjectTreeRows({ q, status, assignee, includeEmpty })
     sendJson(res, 200, payload)
@@ -391,7 +391,7 @@ const createProject = async (req, res) => {
       q: body?.q,
       status: body?.status,
       assignee: body?.assignee,
-      includeEmpty: body?.includeEmpty,
+      includeEmpty: body?.includeEmpty ?? true,
     })
     sendJson(res, 200, payload)
   } catch (error) {
@@ -417,7 +417,7 @@ const createProduct = async (req, res) => {
       q: body?.q,
       status: body?.status,
       assignee: body?.assignee,
-      includeEmpty: body?.includeEmpty,
+      includeEmpty: body?.includeEmpty ?? true,
     })
     sendJson(res, 200, payload)
   } catch (error) {
@@ -444,7 +444,7 @@ const createTask = async (req, res) => {
       q: body?.q,
       status: body?.status,
       assignee: body?.assignee,
-      includeEmpty: body?.includeEmpty,
+      includeEmpty: body?.includeEmpty ?? true,
     })
     sendJson(res, 200, payload)
   } catch (error) {

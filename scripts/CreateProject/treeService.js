@@ -39,7 +39,7 @@ const upsertTask = (tasksById, taskOrderByProduct, taskData) => {
   taskOrderByProduct.get(taskData.parentId).push(taskData.id)
 }
 
-export const buildProjectTreeRows = async ({ q, status, assignee, includeEmpty } = {}) => {
+export const buildProjectTreeRows = async ({ q, status, assignee, includeEmpty = true } = {}) => {
   const connection = await getConnection()
   const statusFilters = normalizeArray(status)
   const assigneeFilters = normalizeArray(assignee)
