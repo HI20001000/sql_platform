@@ -28,7 +28,7 @@ const formatTypeLabel = (type) => {
   }
 }
 
-const isExpanded = (id) => expandedIds.has(id)
+const isExpanded = (id) => expandedIds.value.has(id)
 const canToggle = (row) => row.type !== 'task'
 </script>
 
