@@ -18,11 +18,11 @@ const depthPadding = (depth) => `${depth * 24}px`
 const formatTypeLabel = (type) => {
   switch (type) {
     case 'project':
-      return '📁 Project'
+      return '📁'
     case 'product':
-      return '📦 Product'
+      return '📦'
     case 'task':
-      return '✅ Task'
+      return '✅'
     default:
       return ''
   }
@@ -176,6 +176,16 @@ const canToggle = (row) => row.type !== 'task'
   border-bottom: 1px solid #f1f5f9;
   align-items: center;
   font-size: 0.95rem;
+}
+
+.table-row > div {
+  border-right: 1px solid #e2e8f0;
+  padding-right: 1rem;
+}
+
+.table-row > div:last-child {
+  border-right: none;
+  padding-right: 0;
 }
 
 .table-row--header {
