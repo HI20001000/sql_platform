@@ -122,6 +122,39 @@ const handleSubmit = () => {
             <span>{{ step.created_at }}</span>
           </div>
         </div>
+        <section class="step-form">
+          <div class="step-form__header">
+            <div>
+              <p class="step-form__title">新增步驟</p>
+              <p class="step-form__subtitle">新增後可立即在上方列表查看。</p>
+            </div>
+            <button
+              class="step-form__submit"
+              type="button"
+              :disabled="submitLoading || !contentInput.trim()"
+              @click="handleSubmit"
+            >
+              {{ submitLoading ? '新增中...' : '新增步驟' }}
+            </button>
+          </div>
+          <div class="step-form__row">
+            <label class="step-form__field">
+              <span>狀態</span>
+              <input v-model="statusInput" type="text" placeholder="todo / doing / done" />
+            </label>
+            <label class="step-form__field">
+              <span>負責人</span>
+              <input v-model="assigneeInput" type="text" placeholder="assignee user id" />
+            </label>
+          </div>
+          <label class="step-form__field step-form__field--full">
+            <span>內容</span>
+            <textarea v-model="contentInput" rows="3" placeholder="輸入步驟內容"></textarea>
+          </label>
+          <div class="step-form__actions">
+            <span v-if="submitError" class="step-form__error">{{ submitError }}</span>
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -180,11 +213,32 @@ const handleSubmit = () => {
 
 .step-form {
   display: grid;
-  gap: 0.75rem;
-  padding: 1rem;
-  border-radius: 12px;
-  background: #f8fafc;
-  margin-bottom: 1.25rem;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  border: 1px solid #e2e8f0;
+  margin-top: 1.5rem;
+}
+
+.step-form__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.step-form__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.step-form__subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
 }
 
 .step-form__row {
@@ -202,11 +256,20 @@ const handleSubmit = () => {
 
 .step-form__field input,
 .step-form__field textarea {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.5rem 0.75rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 12px;
+  padding: 0.6rem 0.9rem;
   font-size: 0.9rem;
   font-family: inherit;
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.step-form__field input:focus,
+.step-form__field textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
 
 .step-form__field--full {
@@ -216,7 +279,7 @@ const handleSubmit = () => {
 .step-form__actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
 }
 
@@ -227,17 +290,19 @@ const handleSubmit = () => {
 
 .step-form__submit {
   border: none;
-  background: #2563eb;
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
   color: #ffffff;
-  padding: 0.5rem 1.2rem;
+  padding: 0.55rem 1.4rem;
   border-radius: 999px;
   cursor: pointer;
   font-weight: 600;
+  box-shadow: 0 12px 20px rgba(37, 99, 235, 0.2);
 }
 
 .step-form__submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .modal-state {
