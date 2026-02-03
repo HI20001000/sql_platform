@@ -1,8 +1,13 @@
 <script setup>
 import { onMounted } from 'vue'
+import router from '../../router/index.js'
 import { useUserInfo } from '../../scripts/useUserInfo.js'
 
 const { icon, iconBg, loadUserInfo } = useUserInfo()
+
+const handleCreateProject = () => {
+  router.push('/projects/create')
+}
 
 onMounted(() => {
   loadUserInfo()
@@ -17,7 +22,14 @@ onMounted(() => {
       </div>
     </div>
     <div class="toolbar-section toolbar-section--middle" aria-label="主要操作">
-      <button class="tool-button" type="button" aria-label="新增">➕</button>
+      <button
+        class="tool-button"
+        type="button"
+        aria-label="新增"
+        @click="handleCreateProject"
+      >
+        ➕
+      </button>
       <button class="tool-button" type="button" aria-label="編輯">✏️</button>
       <button class="tool-button" type="button" aria-label="刪除">🗑️</button>
     </div>
