@@ -1,5 +1,6 @@
 const buildRow = ({
   id,
+  parentId,
   name,
   type,
   status,
@@ -10,6 +11,7 @@ const buildRow = ({
   source,
 }) => ({
   id,
+  parentId,
   name,
   type,
   status,
@@ -26,6 +28,7 @@ export const flattenProjects = (projects) => {
     rows.push(
       buildRow({
         id: project.id,
+        parentId: null,
         name: project.name,
         type: 'project',
         status: project.status,
@@ -40,6 +43,7 @@ export const flattenProjects = (projects) => {
       rows.push(
         buildRow({
           id: product.id,
+          parentId: project.id,
           name: product.name,
           type: 'product',
           status: null,
@@ -54,6 +58,7 @@ export const flattenProjects = (projects) => {
         rows.push(
           buildRow({
             id: task.id,
+            parentId: product.id,
             name: task.name,
             type: 'task',
             status: null,
