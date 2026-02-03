@@ -7,6 +7,7 @@ import {
   createProductNode,
   createProjectNode,
   createTaskNode,
+  createTaskStep,
   fetchTaskStepsByTaskId,
   getConnection as getCreateProjectConnection,
 } from '../scripts/CreateProject/index.js'
@@ -376,6 +377,31 @@ const fetchTaskSteps = async (req, res) => {
   }
 }
 
+const addTaskStep = async (req, res) => {
+  const body = await parseBody(req)
+  const taskId = body?.taskId
+  const content = body?.content?.trim()
+  const status = body?.status?.trim() || 'todo'
+  if (!taskId || !content) {
+    sendJson(res, 400, { message: 'taskId and content are required' })
+    return
+  }
+  try {
+    const connection = await getCreateProjectConnection()
+    const step = await createTaskStep(connection, {
+      taskId,
+      status,
+      content,
+      createdBy: body?.created_by?.trim() || 'system',
+      assigneeUserId: body?.assignee_user_id?.trim() || null,
+    })
+    sendJson(res, 200, { step })
+  } catch (error) {
+    await logger.error(`Task step create failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to create task step' })
+  }
+}
+
 const createProject = async (req, res) => {
   const body = await parseBody(req)
   const name = body?.name?.trim()
@@ -485,6 +511,10 @@ const start = async () => {
     }
     if (url.pathname === '/api/create-project/task-steps' && req.method === 'POST') {
       await fetchTaskSteps(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/task-step' && req.method === 'POST') {
+      await addTaskStep(req, res)
       return
     }
     if (url.pathname === '/api/create-project/project' && req.method === 'POST') {
