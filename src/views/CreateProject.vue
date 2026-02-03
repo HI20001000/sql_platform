@@ -18,11 +18,11 @@ const depthPadding = (depth) => `${depth * 24}px`
 const formatTypeLabel = (type) => {
   switch (type) {
     case 'project':
-      return 'Project'
+      return '📁 Project'
     case 'product':
-      return 'Product'
+      return '📦 Product'
     case 'task':
-      return 'Task'
+      return '✅ Task'
     default:
       return ''
   }
@@ -165,6 +165,7 @@ const canToggle = (row) => row.type !== 'task'
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+  color: #1f2937;
 }
 
 .table-row {
