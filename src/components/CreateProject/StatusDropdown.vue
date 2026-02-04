@@ -18,11 +18,19 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  menuId: {
+    type: String,
+    default: '',
+  },
+  activeMenuId: {
+    type: [String, null],
+    default: null,
+  },
 })
 
-const emit = defineEmits(['select', 'create'])
+const emit = defineEmits(['select', 'create', 'toggle'])
 
-const open = ref(false)
+const open = computed(() => props.activeMenuId === props.menuId)
 const showCreate = ref(false)
 const newName = ref('')
 const newColor = ref('#e2e8f0')
@@ -36,13 +44,17 @@ const resetCreate = () => {
 }
 
 const toggleMenu = () => {
-  open.value = !open.value
-  if (!open.value) resetCreate()
+  if (open.value) {
+    emit('toggle', null)
+    resetCreate()
+    return
+  }
+  emit('toggle', props.menuId)
 }
 
 const handleSelect = (status) => {
   emit('select', status)
-  open.value = false
+  emit('toggle', null)
   resetCreate()
 }
 
@@ -53,13 +65,13 @@ const handleCreateToggle = () => {
 const handleCreate = () => {
   if (!newName.value.trim()) return
   emit('create', { name: newName.value.trim(), color: newColor.value })
-  open.value = false
+  emit('toggle', null)
   resetCreate()
 }
 
 const handleClickOutside = (event) => {
   if (!event.target.closest('.status-dropdown')) {
-    open.value = false
+    emit('toggle', null)
     resetCreate()
   }
 }

@@ -32,6 +32,7 @@ const error = ref('')
 const statusOptions = ref([])
 const userOptions = ref([])
 const metaError = ref('')
+const activeMenuId = ref(null)
 
 const expandedMap = ref(new Set())
 
@@ -523,6 +524,10 @@ const handleStatusSelect = async (row, status) => {
   }
 }
 
+const setActiveMenu = (menuId) => {
+  activeMenuId.value = menuId
+}
+
 const handleStatusCreate = async ({ name, color }) => {
   try {
     const response = await createStatus({ name, color })
@@ -689,8 +694,11 @@ onMounted(() => {
                 :status-name="row.status"
                 :status-color="row.status_color"
                 :statuses="statusOptions"
+                :menu-id="`status-${row.id}`"
+                :active-menu-id="activeMenuId"
                 @select="(status) => handleStatusSelect(row, status)"
                 @create="handleStatusCreate"
+                @toggle="setActiveMenu"
               />
               <span v-else class="status-muted">-</span>
             </div>
@@ -699,7 +707,10 @@ onMounted(() => {
                 v-if="row.rowType === 'task'"
                 :assignee-id="row.assignee_user_id"
                 :users="userOptions"
+                :menu-id="`assignee-${row.id}`"
+                :active-menu-id="activeMenuId"
                 @select="(user) => handleAssigneeSelect(row, user)"
+                @toggle="setActiveMenu"
               />
               <span v-else>-</span>
             </div>

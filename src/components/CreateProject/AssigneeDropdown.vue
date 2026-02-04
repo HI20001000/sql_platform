@@ -10,11 +10,19 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  menuId: {
+    type: String,
+    default: '',
+  },
+  activeMenuId: {
+    type: [String, null],
+    default: null,
+  },
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'toggle'])
 
-const open = ref(false)
+const open = computed(() => props.activeMenuId === props.menuId)
 
 const displayAssignee = computed(() => {
   const found = props.users.find((user) => user.mail === props.assigneeId)
@@ -22,17 +30,17 @@ const displayAssignee = computed(() => {
 })
 
 const toggleMenu = () => {
-  open.value = !open.value
+  emit('toggle', open.value ? null : props.menuId)
 }
 
 const handleSelect = (user) => {
   emit('select', user)
-  open.value = false
+  emit('toggle', null)
 }
 
 const handleClickOutside = (event) => {
   if (!event.target.closest('.assignee-dropdown')) {
-    open.value = false
+    emit('toggle', null)
   }
 }
 
