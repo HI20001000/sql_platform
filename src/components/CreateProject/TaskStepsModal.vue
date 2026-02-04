@@ -32,7 +32,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['close', 'submit'])
+const emit = defineEmits(['close', 'submit', 'delete-step'])
 
 const contentInput = ref('')
 const assigneeInput = ref('')
@@ -82,12 +82,22 @@ const handleSubmit = () => {
             <span>內容</span>
             <span>建立者</span>
             <span>建立時間</span>
+            <span>操作</span>
           </div>
           <div v-for="step in steps" :key="step.id" class="steps-row">
             <span>{{ step.assignee_user_id ?? '-' }}</span>
             <span class="step-content">{{ step.content }}</span>
             <span>{{ step.created_by || '-' }}</span>
             <span>{{ step.created_at }}</span>
+            <span class="steps-actions">
+              <button
+                class="steps-action-button steps-action-button--danger"
+                type="button"
+                @click.stop="emit('delete-step', step)"
+              >
+                刪除
+              </button>
+            </span>
           </div>
         </div>
         <section class="step-form">
@@ -283,7 +293,7 @@ const handleSubmit = () => {
 
 .steps-row {
   display: grid;
-  grid-template-columns: 1fr 2.2fr 1fr 1fr;
+  grid-template-columns: 1fr 2.2fr 1fr 1fr auto;
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 0.5rem;
@@ -313,5 +323,39 @@ const handleSubmit = () => {
 
 .step-content {
   color: #0f172a;
+}
+
+.steps-actions {
+  display: inline-flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.steps-action-button {
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  font-size: 0.8rem;
+  background: #ffffff;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.steps-action-button:hover {
+  border-color: #6366f1;
+  color: #4338ca;
+  background: #eef2ff;
+}
+
+.steps-action-button--danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.steps-action-button--danger:hover {
+  border-color: #f87171;
+  background: #fee2e2;
+  color: #b91c1c;
 }
 </style>
