@@ -3,6 +3,7 @@ export { createProject, fetchProjects } from './projects.js'
 export { createProduct, fetchProducts } from './products.js'
 export { createTask, fetchTasksWithParents } from './tasks.js'
 export { createTaskStep, fetchTaskStepsByTaskId } from './taskSteps.js'
+export { createStatus, fetchStatuses, getDefaultStatusId } from './statuses.js'
 export {
   deleteProductTree,
   deleteProjectTree,
