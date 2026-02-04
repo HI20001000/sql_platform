@@ -34,6 +34,37 @@ export const fetchTaskSteps = async (taskId) => {
   return response.json()
 }
 
+export const createTaskStep = async ({
+  taskId,
+  content,
+  created_by,
+  assignee_user_id,
+}) => {
+  return requestJson(`${apiBaseUrl}/api/create-project/task-step`, {
+    taskId,
+    content,
+    created_by,
+    assignee_user_id,
+  })
+}
+
+export const updateRow = async ({ rowType, id, name, status, assignee_user_id }) => {
+  return requestJson(`${apiBaseUrl}/api/create-project/update-row`, {
+    rowType,
+    id,
+    name,
+    status,
+    assignee_user_id,
+  })
+}
+
+export const deleteRow = async ({ rowType, id }) => {
+  return requestJson(`${apiBaseUrl}/api/create-project/delete-row`, {
+    rowType,
+    id,
+  })
+}
+
 const requestJson = async (url, body) => {
   const response = await fetch(url, {
     method: 'POST',
