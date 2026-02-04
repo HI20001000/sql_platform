@@ -688,6 +688,9 @@ onMounted(() => {
   border: none;
   background: transparent;
   font-size: 1.2rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  line-height: 1.2rem;
   color: #64748b;
   cursor: pointer;
 }
