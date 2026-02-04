@@ -457,18 +457,19 @@ const handleMoreUpdate = async ({ status, assignee_user_id }) => {
 }
 
 const handleAddStep = async ({ content, assignee_user_id }) => {
-  if (!currentTask.value?.id) return
+  const taskId = currentTask.value?.id
+  if (!taskId) return
   stepSubmitLoading.value = true
   stepSubmitError.value = ''
   const user = getCurrentUser()
   try {
     const response = await createTaskStep({
-      taskId: currentTask.value.id,
+      taskId,
       content,
       assignee_user_id,
       created_by: user?.username || user?.mail || 'system',
     })
-    if (response?.step) {
+    if (response?.step && currentTask.value?.id === taskId) {
       stepsData.value = [...stepsData.value, response.step]
     }
   } catch (err) {
