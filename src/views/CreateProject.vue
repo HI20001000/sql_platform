@@ -687,15 +687,15 @@ onMounted(() => {
 .toggle-button {
   border: none;
   background: transparent;
-  font-size: 1rem;
+  font-size: 1.2rem;
   color: #64748b;
   cursor: pointer;
 }
 
 .toggle-spacer {
   display: inline-block;
-  width: 16px;
-  height: 16px;
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .type-tag {
