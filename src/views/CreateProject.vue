@@ -103,9 +103,15 @@ const normalizeRows = (data) => {
 
   normalized.forEach((row) => {
     const parentId = row.parentId ?? null
-    if (parentId !== null && parentId !== undefined) {
-      childCounts.set(parentId, (childCounts.get(parentId) || 0) + 1)
-    }
+    if (parentId === null || parentId === undefined) return
+    const parentKey =
+      row.rowType === 'product'
+        ? rowKey('project', parentId)
+        : row.rowType === 'task'
+          ? rowKey('product', parentId)
+          : null
+    if (!parentKey) return
+    childCounts.set(parentKey, (childCounts.get(parentKey) || 0) + 1)
   })
 
   normalized.forEach((row) => {
@@ -117,7 +123,8 @@ const normalizeRows = (data) => {
     const expectedLevel =
       row.rowType === 'project' ? 0 : row.rowType === 'product' ? 1 : row.rowType === 'task' ? 2 : row.level
     row.level = expectedLevel
-    row.hasChildren = row.rowType !== 'task' && (childCounts.get(row.id) || 0) > 0
+    row.hasChildren =
+      row.rowType !== 'task' && (childCounts.get(rowKey(row.rowType, row.id)) || 0) > 0
   })
 
   return normalized
@@ -232,14 +239,13 @@ const resetExpandedMap = (data) => {
 const applyTreeResponse = (response, expandKeys = [], { preserveExpanded = false } = {}) => {
   rows.value = normalizeRows(response.rows || [])
   taskCount.value = response.taskCount || 0
+  const next = preserveExpanded ? new Set(expandedMap.value) : new Set()
   if (!preserveExpanded) {
     resetExpandedMap(rows.value)
-    if (expandKeys.length > 0) {
-      const next = new Set(expandedMap.value)
-      expandKeys.forEach((key) => next.add(key))
-      expandedMap.value = next
-    }
+    expandedMap.value.forEach((key) => next.add(key))
   }
+  expandKeys.forEach((key) => next.add(key))
+  expandedMap.value = next
 }
 
 const buildFilterPayload = () => ({
