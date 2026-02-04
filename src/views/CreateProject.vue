@@ -1,14 +1,19 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import AddNodeModal from '../components/CreateProject/AddNodeModal.vue'
+import EditRowModal from '../components/CreateProject/EditRowModal.vue'
+import MoreRowModal from '../components/CreateProject/MoreRowModal.vue'
 import TaskStepsModal from '../components/CreateProject/TaskStepsModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
   createProduct,
   createProject,
   createTask,
+  createTaskStep,
+  deleteRow,
   fetchProjectTree,
   fetchTaskSteps,
+  updateRow,
 } from '../scripts/CreateProject/api.js'
 
 const searchQuery = ref('')
@@ -27,6 +32,16 @@ const currentTask = ref(null)
 const stepsLoading = ref(false)
 const stepsError = ref('')
 const stepsData = ref([])
+const stepSubmitLoading = ref(false)
+const stepSubmitError = ref('')
+const editModalVisible = ref(false)
+const editModalRow = ref(null)
+const editModalLoading = ref(false)
+const editModalError = ref('')
+const moreModalVisible = ref(false)
+const moreModalRow = ref(null)
+const moreModalLoading = ref(false)
+const moreModalError = ref('')
 
 const addModalVisible = ref(false)
 const addModalType = ref('project')
@@ -78,27 +93,91 @@ const addModalConfig = computed(() => {
   }
 })
 
+const MAX_TREE_DEPTH = 20
+
+const normalizeRows = (data) => {
+  const rawRows = Array.isArray(data) ? data : []
+  const normalized = rawRows.map((row) => ({ ...row }))
+  const childCounts = new Map()
+
+  normalized.forEach((row) => {
+    const parentId = row.parentId ?? null
+    if (parentId !== null && parentId !== undefined) {
+      childCounts.set(parentId, (childCounts.get(parentId) || 0) + 1)
+    }
+  })
+
+  normalized.forEach((row) => {
+    if (row.parentId === row.id) {
+      // Root cause note: product rows returned after creation sometimes self-reference
+      // parentId === id, forming a cycle that made the generic parent walk() recurse forever.
+      row.parentId = null
+    }
+    const expectedLevel =
+      row.rowType === 'project' ? 0 : row.rowType === 'product' ? 1 : row.rowType === 'task' ? 2 : row.level
+    row.level = expectedLevel
+    row.hasChildren = row.rowType !== 'task' && (childCounts.get(row.id) || 0) > 0
+  })
+
+  return normalized
+}
+
 const visibleRows = computed(() => {
   if (!rows.value.length) return []
-  const byParent = new Map()
+
+  const projects = rows.value.filter((row) => row.rowType === 'project')
+  const productsByProject = new Map()
+  const tasksByProduct = new Map()
+
   rows.value.forEach((row) => {
-    const key = row.parentId ?? 'root'
-    if (!byParent.has(key)) byParent.set(key, [])
-    byParent.get(key).push(row)
+    if (row.rowType === 'product') {
+      const key = row.parentId ?? 'root'
+      if (!productsByProject.has(key)) productsByProject.set(key, [])
+      productsByProject.get(key).push(row)
+    } else if (row.rowType === 'task') {
+      const key = row.parentId ?? 'root'
+      if (!tasksByProduct.has(key)) tasksByProduct.set(key, [])
+      tasksByProduct.get(key).push(row)
+    }
   })
 
   const output = []
-  const walk = (parentKey) => {
-    const children = byParent.get(parentKey) || []
-    children.forEach((child) => {
-      output.push(child)
-      if (expandedMap.value.has(child.id)) {
-        walk(child.id)
+  const visited = new Set()
+  const walkTasks = (productId, depth) => {
+    if (depth > MAX_TREE_DEPTH) return
+    const tasks = tasksByProduct.get(productId) || []
+    tasks.forEach((task) => {
+      const nodeKey = `${task.rowType}:${task.id}`
+      if (visited.has(nodeKey)) return
+      visited.add(nodeKey)
+      output.push(task)
+    })
+  }
+
+  const walkProducts = (projectId, depth) => {
+    if (depth > MAX_TREE_DEPTH) return
+    const products = productsByProject.get(projectId) || []
+    products.forEach((product) => {
+      const nodeKey = `${product.rowType}:${product.id}`
+      if (visited.has(nodeKey)) return
+      visited.add(nodeKey)
+      output.push(product)
+      if (expandedMap.value.has(product.id)) {
+        walkTasks(product.id, depth + 1)
       }
     })
   }
 
-  walk('root')
+  projects.forEach((project) => {
+    const nodeKey = `${project.rowType}:${project.id}`
+    if (visited.has(nodeKey)) return
+    visited.add(nodeKey)
+    output.push(project)
+    if (expandedMap.value.has(project.id)) {
+      walkProducts(project.id, 1)
+    }
+  })
+
   return output
 })
 
@@ -144,16 +223,12 @@ const resetExpandedMap = (data) => {
     data.forEach((row) => {
       if (row.rowType !== 'task') next.add(row.id)
     })
-  } else {
-    data.forEach((row) => {
-      if (row.rowType === 'project' && row.hasChildren) next.add(row.id)
-    })
   }
   expandedMap.value = next
 }
 
 const applyTreeResponse = (response, expandIds = []) => {
-  rows.value = response.rows || []
+  rows.value = normalizeRows(response.rows || [])
   taskCount.value = response.taskCount || 0
   resetExpandedMap(rows.value)
   if (expandIds.length > 0) {
@@ -262,6 +337,7 @@ const openTaskSteps = async (row) => {
   stepsLoading.value = true
   stepsError.value = ''
   stepsData.value = []
+  stepSubmitError.value = ''
   try {
     const response = await fetchTaskSteps(row.id)
     stepsData.value = response.steps || []
@@ -278,6 +354,115 @@ const closeTaskSteps = () => {
   stepsData.value = []
   stepsError.value = ''
   stepsLoading.value = false
+  stepSubmitError.value = ''
+  stepSubmitLoading.value = false
+}
+
+const openEditModal = (row) => {
+  editModalRow.value = row
+  editModalError.value = ''
+  editModalVisible.value = true
+}
+
+const closeEditModal = () => {
+  editModalVisible.value = false
+  editModalRow.value = null
+  editModalError.value = ''
+  editModalLoading.value = false
+}
+
+const handleEditSubmit = async (name) => {
+  if (!editModalRow.value) return
+  editModalLoading.value = true
+  editModalError.value = ''
+  try {
+    await updateRow({
+      rowType: editModalRow.value.rowType,
+      id: editModalRow.value.id,
+      name,
+    })
+    closeEditModal()
+    await loadTree()
+  } catch (err) {
+    editModalError.value = err?.message || '更新失敗'
+  } finally {
+    editModalLoading.value = false
+  }
+}
+
+const openMoreModal = (row) => {
+  moreModalRow.value = row
+  moreModalError.value = ''
+  moreModalVisible.value = true
+}
+
+const closeMoreModal = () => {
+  moreModalVisible.value = false
+  moreModalRow.value = null
+  moreModalError.value = ''
+  moreModalLoading.value = false
+}
+
+const handleMoreDelete = async () => {
+  if (!moreModalRow.value) return
+  const confirmed = window.confirm('確定要刪除此筆資料？子階層資料也會一併刪除。')
+  if (!confirmed) return
+  moreModalLoading.value = true
+  moreModalError.value = ''
+  try {
+    await deleteRow({
+      rowType: moreModalRow.value.rowType,
+      id: moreModalRow.value.id,
+    })
+    closeMoreModal()
+    await loadTree()
+  } catch (err) {
+    moreModalError.value = err?.message || '刪除失敗'
+  } finally {
+    moreModalLoading.value = false
+  }
+}
+
+const handleMoreUpdate = async ({ status, assignee_user_id }) => {
+  if (!moreModalRow.value) return
+  moreModalLoading.value = true
+  moreModalError.value = ''
+  try {
+    await updateRow({
+      rowType: moreModalRow.value.rowType,
+      id: moreModalRow.value.id,
+      status,
+      assignee_user_id,
+    })
+    closeMoreModal()
+    await loadTree()
+  } catch (err) {
+    moreModalError.value = err?.message || '更新失敗'
+  } finally {
+    moreModalLoading.value = false
+  }
+}
+
+const handleAddStep = async ({ content, assignee_user_id }) => {
+  if (!currentTask.value?.id) return
+  stepSubmitLoading.value = true
+  stepSubmitError.value = ''
+  const user = getCurrentUser()
+  try {
+    const response = await createTaskStep({
+      taskId: currentTask.value.id,
+      content,
+      assignee_user_id,
+      created_by: user?.username || user?.mail || 'system',
+    })
+    if (response?.step) {
+      stepsData.value = [...stepsData.value, response.step]
+    }
+  } catch (err) {
+    stepSubmitError.value = err?.message || '新增步驟失敗'
+  } finally {
+    stepSubmitLoading.value = false
+  }
 }
 
 let debounceTimer = null
@@ -362,8 +547,6 @@ onMounted(() => {
             v-for="row in visibleRows"
             :key="`${row.rowType}-${row.id}`"
             class="table-row"
-            :class="{ clickable: row.rowType === 'task' }"
-            @click="row.rowType === 'task' ? openTaskSteps(row) : null"
           >
             <div class="name-cell" :style="{ paddingLeft: depthPadding(row.level) }">
               <button
@@ -374,26 +557,39 @@ onMounted(() => {
               >
                 {{ isExpanded(row.id) ? '▾' : '▸' }}
               </button>
+              <span v-else class="toggle-spacer" aria-hidden="true"></span>
               <span class="type-tag" :class="`type-tag--${row.rowType}`">
                 {{ formatTypeLabel(row.rowType) }}
               </span>
               <span class="node-name">{{ row.name }}</span>
-              <button
-                v-if="row.rowType === 'task'"
-                class="steps-button"
-                type="button"
-                @click.stop="openTaskSteps(row)"
-              >
-                查看步驟
-              </button>
-              <button
-                v-else
-                class="add-button"
-                type="button"
-                @click.stop="handleRowAdd(row)"
-              >
-                + 新增
-              </button>
+              <div class="row-actions">
+                <button
+                  v-if="row.rowType === 'task'"
+                  class="icon-button"
+                  type="button"
+                  @click.stop="openTaskSteps(row)"
+                >
+                  🔍
+                  <span class="sr-only">查看步驟</span>
+                </button>
+                <button
+                  v-if="row.rowType !== 'task'"
+                  class="icon-button"
+                  type="button"
+                  @click.stop="handleRowAdd(row)"
+                >
+                  +
+                  <span class="sr-only">新增</span>
+                </button>
+                <button class="icon-button" type="button" @click.stop="openEditModal(row)">
+                  ✏️
+                  <span class="sr-only">編輯</span>
+                </button>
+                <button class="icon-button" type="button" @click.stop="openMoreModal(row)">
+                  ⋯
+                  <span class="sr-only">更多</span>
+                </button>
+              </div>
             </div>
             <div class="status-cell">
               <span v-if="row.rowType === 'task'" class="status-pill">
@@ -415,7 +611,27 @@ onMounted(() => {
       :steps="stepsData"
       :loading="stepsLoading"
       :error="stepsError"
+      :submit-loading="stepSubmitLoading"
+      :submit-error="stepSubmitError"
       @close="closeTaskSteps"
+      @submit="handleAddStep"
+    />
+    <EditRowModal
+      :visible="editModalVisible"
+      :row="editModalRow"
+      :loading="editModalLoading"
+      :error="editModalError"
+      @close="closeEditModal"
+      @submit="handleEditSubmit"
+    />
+    <MoreRowModal
+      :visible="moreModalVisible"
+      :row="moreModalRow"
+      :loading="moreModalLoading"
+      :error="moreModalError"
+      @close="closeMoreModal"
+      @delete="handleMoreDelete"
+      @update="handleMoreUpdate"
     />
     <AddNodeModal
       :visible="addModalVisible"
@@ -577,14 +793,6 @@ onMounted(() => {
   font-size: 0.85rem;
 }
 
-.table-row.clickable {
-  cursor: pointer;
-}
-
-.table-row.clickable:hover {
-  background: #f8fafc;
-}
-
 .name-cell {
   display: flex;
   align-items: center;
@@ -595,9 +803,18 @@ onMounted(() => {
 .toggle-button {
   border: none;
   background: transparent;
-  font-size: 1rem;
+  font-size: 1.2rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  line-height: 1.2rem;
   color: #64748b;
   cursor: pointer;
+}
+
+.toggle-spacer {
+  display: inline-block;
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .type-tag {
@@ -633,14 +850,41 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 
-.steps-button {
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  color: #475569;
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: 0.4rem;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.icon-button {
+  border: none;
+  background: #f1f5f9;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
   cursor: pointer;
+}
+
+.table-row:hover .row-actions {
+  opacity: 1;
+  visibility: visible;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
 
 .table-empty {
@@ -660,24 +904,6 @@ onMounted(() => {
   border-radius: 999px;
   font-size: 0.8rem;
   cursor: pointer;
-}
-
-.add-button {
-  border: 1px dashed #cbd5f5;
-  background: #f8fafc;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  color: #475569;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.table-row:hover .add-button {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .status-cell {
