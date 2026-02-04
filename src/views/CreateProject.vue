@@ -572,7 +572,12 @@ onMounted(() => {
                   🔍
                   <span class="sr-only">查看步驟</span>
                 </button>
-                <button class="icon-button" type="button" @click.stop="handleRowAdd(row)">
+                <button
+                  v-if="row.rowType !== 'task'"
+                  class="icon-button"
+                  type="button"
+                  @click.stop="handleRowAdd(row)"
+                >
                   +
                   <span class="sr-only">新增</span>
                 </button>
