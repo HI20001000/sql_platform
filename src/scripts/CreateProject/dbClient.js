@@ -105,7 +105,12 @@ const ensureColumn = async (db, table, column, definition) => {
     [MYSQL_DATABASE, table, column]
   )
   if ((rows[0]?.count ?? 0) > 0) return
-  await db.query(`ALTER TABLE \`${table}\` ADD COLUMN ${column} ${definition}`)
+  try {
+    await db.query(`ALTER TABLE \`${table}\` ADD COLUMN ${column} ${definition}`)
+  } catch (error) {
+    if (error?.code === 'ER_DUP_FIELDNAME') return
+    throw error
+  }
 }
 
 const backfillStatusIds = async (db) => {
