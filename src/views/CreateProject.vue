@@ -564,14 +564,6 @@ onMounted(() => {
                 {{ formatTypeLabel(row.rowType) }}
               </span>
               <span class="node-name">{{ row.name }}</span>
-              <button
-                v-if="row.rowType === 'task'"
-                class="steps-button"
-                type="button"
-                @click.stop="openTaskSteps(row)"
-              >
-                查看步驟
-              </button>
               <div class="row-actions">
                 <button
                   v-if="row.rowType !== 'task'"
@@ -581,6 +573,15 @@ onMounted(() => {
                 >
                   +
                   <span class="sr-only">新增</span>
+                </button>
+                <button
+                  v-if="row.rowType === 'task'"
+                  class="icon-button"
+                  type="button"
+                  @click.stop="openTaskSteps(row)"
+                >
+                  🔍
+                  <span class="sr-only">查看步驟</span>
                 </button>
                 <button class="icon-button" type="button" @click.stop="openEditModal(row)">
                   ✏️
@@ -895,16 +896,6 @@ onMounted(() => {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   border: 0;
-}
-
-.steps-button {
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  color: #475569;
-  cursor: pointer;
 }
 
 .table-empty {
