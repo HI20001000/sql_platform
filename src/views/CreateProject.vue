@@ -33,6 +33,7 @@ const statusOptions = ref([])
 const userOptions = ref([])
 const metaError = ref('')
 const activeMenuId = ref(null)
+const stepAssigneeMenuId = 'step-assignee'
 
 const expandedMap = ref(new Set())
 
@@ -209,6 +210,14 @@ const getCurrentUser = () => {
   }
 }
 
+const resolveCurrentUserId = () => {
+  const user = getCurrentUser()
+  const userMail = user?.mail
+  if (!userMail) return null
+  const matched = userOptions.value.find((entry) => entry.mail === userMail)
+  return matched?.id ?? null
+}
+
 const formatTypeLabel = (type) => {
   switch (type) {
     case 'project':
@@ -336,7 +345,7 @@ const handleAddSubmit = async (name) => {
         title: name,
         status_id: defaultStatusId.value,
         created_by: createdBy,
-        assignee_user_id: user?.mail || null,
+        assignee_user_id: resolveCurrentUserId(),
         ...buildFilterPayload(),
       })
       const projectId = addModalParent.value?.parentId
@@ -372,6 +381,7 @@ const openTaskSteps = async (row) => {
   stepsError.value = ''
   stepsData.value = []
   stepSubmitError.value = ''
+  activeMenuId.value = null
   try {
     const response = await fetchTaskSteps(row.id)
     stepsData.value = response.steps || []
@@ -390,6 +400,7 @@ const closeTaskSteps = () => {
   stepsLoading.value = false
   stepSubmitError.value = ''
   stepSubmitLoading.value = false
+  activeMenuId.value = null
 }
 
 const openEditModal = (row) => {
@@ -545,13 +556,13 @@ const handleAssigneeSelect = async (row, user) => {
     await updateRow({
       rowType: row.rowType,
       id: row.id,
-      assignee_user_id: user?.mail || null,
+      assignee_user_id: user?.id ?? null,
     })
     rows.value = rows.value.map((item) =>
       item.id === row.id && item.rowType === 'task'
         ? {
             ...item,
-            assignee_user_id: user?.mail || null,
+            assignee_user_id: user?.id ?? null,
           }
         : item
     )
@@ -725,12 +736,16 @@ onMounted(() => {
       :visible="modalVisible"
       :task="currentTask"
       :steps="stepsData"
+      :users="userOptions"
+      :active-menu-id="activeMenuId"
+      :menu-id="stepAssigneeMenuId"
       :loading="stepsLoading"
       :error="stepsError"
       :submit-loading="stepSubmitLoading"
       :submit-error="stepSubmitError"
       @close="closeTaskSteps"
       @submit="handleAddStep"
+      @toggle="setActiveMenu"
     />
     <EditRowModal
       :visible="editModalVisible"

@@ -95,6 +95,8 @@ const ensureStatusDefaults = async (db) => {
 const ensureStatusColumns = async (db) => {
   await ensureColumn(db, 'tasks', 'status_id', 'INT NULL')
   await ensureColumn(db, 'task_steps', 'status_id', 'INT NULL')
+  await ensureColumnType(db, 'tasks', 'assignee_user_id', 'INT NULL')
+  await ensureColumnType(db, 'task_steps', 'assignee_user_id', 'INT NULL')
 }
 
 const ensureColumn = async (db, table, column, definition) => {
@@ -111,6 +113,18 @@ const ensureColumn = async (db, table, column, definition) => {
     if (error?.code === 'ER_DUP_FIELDNAME') return
     throw error
   }
+}
+
+const ensureColumnType = async (db, table, column, definition) => {
+  const [rows] = await db.query(
+    `SELECT data_type AS dataType
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [MYSQL_DATABASE, table, column]
+  )
+  if (!rows.length) return
+  if (rows[0]?.dataType === 'int') return
+  await db.query(`ALTER TABLE \`${table}\` MODIFY COLUMN ${column} ${definition}`)
 }
 
 const backfillStatusIds = async (db) => {

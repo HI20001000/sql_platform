@@ -401,7 +401,7 @@ const addTaskStep = async (req, res) => {
       taskId,
       content,
       createdBy: body?.created_by?.trim() || 'system',
-      assigneeUserId: body?.assignee_user_id?.trim() || null,
+      assigneeUserId: normalizeAssigneeId(body?.assignee_user_id),
       statusId,
     })
     sendJson(res, 200, { step })
@@ -437,13 +437,13 @@ const updateRow = async (req, res) => {
       await updateProductName(connection, { productId: id, name })
     } else if (rowType === 'task') {
       const statusId = await resolveStatusId(body?.status_id ?? body?.status)
-      const assigneeUserId = body?.assignee_user_id
+      const assigneeUserId = normalizeAssigneeId(body?.assignee_user_id)
       await updateTaskFields(connection, {
         taskId: id,
         title: body?.name?.trim(),
         statusId: statusId !== undefined ? statusId : undefined,
         assigneeUserId:
-          assigneeUserId !== undefined ? assigneeUserId?.trim() || null : undefined,
+          assigneeUserId !== undefined ? assigneeUserId : undefined,
       })
     }
     sendJson(res, 200, { ok: true })
@@ -550,7 +550,7 @@ const createTask = async (req, res) => {
       title,
       statusId,
       createdBy: body?.created_by?.trim() || 'system',
-      assigneeUserId: body?.assignee_user_id?.trim() || null,
+      assigneeUserId: normalizeAssigneeId(body?.assignee_user_id),
       q: body?.q,
       status: body?.status,
       assignee: body?.assignee,
@@ -618,6 +618,14 @@ const resolveStatusId = async (value) => {
     normalized,
   ])
   return rows[0]?.id ?? null
+}
+
+const normalizeAssigneeId = (value) => {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  const normalized = Number(value)
+  if (Number.isNaN(normalized)) return null
+  return normalized
 }
 
 const start = async () => {

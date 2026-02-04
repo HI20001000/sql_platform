@@ -25,7 +25,7 @@ const emit = defineEmits(['select', 'toggle'])
 const open = computed(() => props.activeMenuId === props.menuId)
 
 const displayAssignee = computed(() => {
-  const found = props.users.find((user) => user.mail === props.assigneeId)
+  const found = props.users.find((user) => String(user.id) === String(props.assigneeId))
   return found?.username || found?.mail || props.assigneeId || '-'
 })
 

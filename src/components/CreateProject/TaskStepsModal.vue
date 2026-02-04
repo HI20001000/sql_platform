@@ -1,5 +1,6 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import AssigneeDropdown from './AssigneeDropdown.vue'
 
 const props = defineProps({
   visible: {
@@ -13,6 +14,18 @@ const props = defineProps({
   steps: {
     type: Array,
     default: () => [],
+  },
+  users: {
+    type: Array,
+    default: () => [],
+  },
+  activeMenuId: {
+    type: [String, null],
+    default: null,
+  },
+  menuId: {
+    type: String,
+    default: '',
   },
   loading: {
     type: Boolean,
@@ -32,14 +45,14 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['close', 'submit', 'delete-step'])
+const emit = defineEmits(['close', 'submit', 'delete-step', 'toggle'])
 
 const contentInput = ref('')
-const assigneeInput = ref('')
+const assigneeInput = ref(null)
 
 const resetForm = () => {
   contentInput.value = ''
-  assigneeInput.value = ''
+  assigneeInput.value = null
 }
 
 watch(
@@ -56,9 +69,22 @@ const handleClose = () => {
 const handleSubmit = () => {
   emit('submit', {
     content: contentInput.value,
-    assignee_user_id: assigneeInput.value.trim() || null,
+    assignee_user_id: assigneeInput.value ?? null,
   })
 }
+
+const resolveAssigneeLabel = (assigneeId) => {
+  if (assigneeId == null) return '-'
+  const user = props.users.find((entry) => String(entry.id) === String(assigneeId))
+  return user?.username || user?.mail || assigneeId
+}
+
+const resolvedAssignees = computed(() => {
+  return props.steps.map((step) => ({
+    ...step,
+    assigneeLabel: resolveAssigneeLabel(step.assignee_user_id),
+  }))
+})
 </script>
 
 <template>
@@ -76,7 +102,7 @@ const handleSubmit = () => {
         <div v-if="loading" class="modal-state">正在載入步驟...</div>
         <div v-else-if="error" class="modal-state modal-state--error">{{ error }}</div>
         <div v-else-if="steps.length === 0" class="modal-state">目前沒有步驟資料。</div>
-        <div v-else class="steps-grid">
+          <div v-else class="steps-grid">
           <div class="steps-row steps-row--head">
             <span>負責人</span>
             <span>內容</span>
@@ -84,8 +110,8 @@ const handleSubmit = () => {
             <span>建立時間</span>
             <span>操作</span>
           </div>
-          <div v-for="step in steps" :key="step.id" class="steps-row">
-            <span>{{ step.assignee_user_id ?? '-' }}</span>
+          <div v-for="step in resolvedAssignees" :key="step.id" class="steps-row">
+            <span>{{ step.assigneeLabel }}</span>
             <span class="step-content">{{ step.content }}</span>
             <span>{{ step.created_by || '-' }}</span>
             <span>{{ step.created_at }}</span>
@@ -117,7 +143,14 @@ const handleSubmit = () => {
           </div>
           <label class="step-form__field">
             <span>負責人</span>
-            <input v-model="assigneeInput" type="text" placeholder="assignee user id" />
+            <AssigneeDropdown
+              :assignee-id="assigneeInput"
+              :users="users"
+              :menu-id="menuId"
+              :active-menu-id="activeMenuId"
+              @select="(user) => (assigneeInput = user?.id ?? null)"
+              @toggle="(value) => emit('toggle', value)"
+            />
           </label>
           <label class="step-form__field step-form__field--full">
             <span>內容</span>
