@@ -32,7 +32,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['close', 'submit', 'edit-step', 'delete-step'])
+const emit = defineEmits(['close', 'submit', 'delete-step'])
 
 const contentInput = ref('')
 const assigneeInput = ref('')
@@ -90,13 +90,6 @@ const handleSubmit = () => {
             <span>{{ step.created_by || '-' }}</span>
             <span>{{ step.created_at }}</span>
             <span class="steps-actions">
-              <button
-                class="steps-action-button"
-                type="button"
-                @click.stop="emit('edit-step', step)"
-              >
-                編輯
-              </button>
               <button
                 class="steps-action-button steps-action-button--danger"
                 type="button"
@@ -336,16 +329,6 @@ const handleSubmit = () => {
   display: inline-flex;
   gap: 0.5rem;
   justify-content: flex-end;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.steps-row--head .steps-actions {
-  opacity: 1;
-}
-
-.steps-row:not(.steps-row--head):hover .steps-actions {
-  opacity: 1;
 }
 
 .steps-action-button {
