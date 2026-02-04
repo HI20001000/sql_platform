@@ -8,8 +8,14 @@ import {
   createProjectNode,
   createTaskNode,
   createTaskStep,
+  deleteProductTree,
+  deleteProjectTree,
+  deleteTaskTree,
   fetchTaskStepsByTaskId,
   getConnection as getCreateProjectConnection,
+  updateProductName,
+  updateProjectName,
+  updateTaskFields,
 } from '../scripts/CreateProject/index.js'
 let createLogger = null
 let createSqlAuditWrapper = null
@@ -400,6 +406,79 @@ const addTaskStep = async (req, res) => {
   }
 }
 
+const updateRow = async (req, res) => {
+  const body = await parseBody(req)
+  const rowType = body?.rowType
+  const id = body?.id
+  if (!rowType || !id) {
+    sendJson(res, 400, { message: 'rowType and id are required' })
+    return
+  }
+  try {
+    const connection = await getCreateProjectConnection()
+    if (rowType === 'project') {
+      const name = body?.name?.trim()
+      if (!name) {
+        sendJson(res, 400, { message: 'name is required' })
+        return
+      }
+      await updateProjectName(connection, { projectId: id, name })
+    } else if (rowType === 'product') {
+      const name = body?.name?.trim()
+      if (!name) {
+        sendJson(res, 400, { message: 'name is required' })
+        return
+      }
+      await updateProductName(connection, { productId: id, name })
+    } else if (rowType === 'task') {
+      const status = body?.status
+      const assigneeUserId = body?.assignee_user_id
+      await updateTaskFields(connection, {
+        taskId: id,
+        title: body?.name?.trim(),
+        status: status !== undefined ? status?.trim() : undefined,
+        assigneeUserId:
+          assigneeUserId !== undefined ? assigneeUserId?.trim() || null : undefined,
+      })
+    }
+    sendJson(res, 200, { ok: true })
+  } catch (error) {
+    await logger.error(`Update row failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to update row' })
+  }
+}
+
+const deleteRow = async (req, res) => {
+  const body = await parseBody(req)
+  const rowType = body?.rowType
+  const id = body?.id
+  if (!rowType || !id) {
+    sendJson(res, 400, { message: 'rowType and id are required' })
+    return
+  }
+  const connection = await getCreateProjectConnection()
+  try {
+    await connection.beginTransaction()
+    if (rowType === 'project') {
+      await deleteProjectTree(connection, { projectId: id })
+    } else if (rowType === 'product') {
+      await deleteProductTree(connection, { productId: id })
+    } else if (rowType === 'task') {
+      await deleteTaskTree(connection, { taskId: id })
+    }
+    await connection.commit()
+    sendJson(res, 200, { ok: true })
+  } catch (error) {
+    try {
+      await connection.rollback()
+    } catch {
+      // ignore rollback errors
+    }
+    await logger.error(`Delete row failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to delete row' })
+  }
+}
+
 const createProject = async (req, res) => {
   const body = await parseBody(req)
   const name = body?.name?.trim()
@@ -513,6 +592,14 @@ const start = async () => {
     }
     if (url.pathname === '/api/create-project/task-step' && req.method === 'POST') {
       await addTaskStep(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/update-row' && req.method === 'POST') {
+      await updateRow(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/delete-row' && req.method === 'POST') {
+      await deleteRow(req, res)
       return
     }
     if (url.pathname === '/api/create-project/project' && req.method === 'POST') {

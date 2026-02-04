@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import AddNodeModal from '../components/CreateProject/AddNodeModal.vue'
+import EditRowModal from '../components/CreateProject/EditRowModal.vue'
+import MoreRowModal from '../components/CreateProject/MoreRowModal.vue'
 import TaskStepsModal from '../components/CreateProject/TaskStepsModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
@@ -8,8 +10,10 @@ import {
   createProject,
   createTask,
   createTaskStep,
+  deleteRow,
   fetchProjectTree,
   fetchTaskSteps,
+  updateRow,
 } from '../scripts/CreateProject/api.js'
 
 const searchQuery = ref('')
@@ -30,6 +34,14 @@ const stepsError = ref('')
 const stepsData = ref([])
 const stepSubmitLoading = ref(false)
 const stepSubmitError = ref('')
+const editModalVisible = ref(false)
+const editModalRow = ref(null)
+const editModalLoading = ref(false)
+const editModalError = ref('')
+const moreModalVisible = ref(false)
+const moreModalRow = ref(null)
+const moreModalLoading = ref(false)
+const moreModalError = ref('')
 
 const addModalVisible = ref(false)
 const addModalType = ref('project')
@@ -346,6 +358,91 @@ const closeTaskSteps = () => {
   stepSubmitLoading.value = false
 }
 
+const openEditModal = (row) => {
+  editModalRow.value = row
+  editModalError.value = ''
+  editModalVisible.value = true
+}
+
+const closeEditModal = () => {
+  editModalVisible.value = false
+  editModalRow.value = null
+  editModalError.value = ''
+  editModalLoading.value = false
+}
+
+const handleEditSubmit = async (name) => {
+  if (!editModalRow.value) return
+  editModalLoading.value = true
+  editModalError.value = ''
+  try {
+    await updateRow({
+      rowType: editModalRow.value.rowType,
+      id: editModalRow.value.id,
+      name,
+    })
+    closeEditModal()
+    await loadTree()
+  } catch (err) {
+    editModalError.value = err?.message || '更新失敗'
+  } finally {
+    editModalLoading.value = false
+  }
+}
+
+const openMoreModal = (row) => {
+  moreModalRow.value = row
+  moreModalError.value = ''
+  moreModalVisible.value = true
+}
+
+const closeMoreModal = () => {
+  moreModalVisible.value = false
+  moreModalRow.value = null
+  moreModalError.value = ''
+  moreModalLoading.value = false
+}
+
+const handleMoreDelete = async () => {
+  if (!moreModalRow.value) return
+  const confirmed = window.confirm('確定要刪除此筆資料？子階層資料也會一併刪除。')
+  if (!confirmed) return
+  moreModalLoading.value = true
+  moreModalError.value = ''
+  try {
+    await deleteRow({
+      rowType: moreModalRow.value.rowType,
+      id: moreModalRow.value.id,
+    })
+    closeMoreModal()
+    await loadTree()
+  } catch (err) {
+    moreModalError.value = err?.message || '刪除失敗'
+  } finally {
+    moreModalLoading.value = false
+  }
+}
+
+const handleMoreUpdate = async ({ status, assignee_user_id }) => {
+  if (!moreModalRow.value) return
+  moreModalLoading.value = true
+  moreModalError.value = ''
+  try {
+    await updateRow({
+      rowType: moreModalRow.value.rowType,
+      id: moreModalRow.value.id,
+      status,
+      assignee_user_id,
+    })
+    closeMoreModal()
+    await loadTree()
+  } catch (err) {
+    moreModalError.value = err?.message || '更新失敗'
+  } finally {
+    moreModalLoading.value = false
+  }
+}
+
 const handleAddStep = async ({ content, assignee_user_id }) => {
   if (!currentTask.value?.id) return
   stepSubmitLoading.value = true
@@ -481,8 +578,19 @@ onMounted(() => {
                 type="button"
                 @click.stop="handleRowAdd(row)"
               >
-                + 新增
+                <span class="add-label">+ 新增</span>
+                <span class="add-icon">+</span>
               </button>
+              <div class="row-actions">
+                <button class="icon-button" type="button" @click.stop="openEditModal(row)">
+                  ✏️
+                  <span class="sr-only">編輯</span>
+                </button>
+                <button class="icon-button" type="button" @click.stop="openMoreModal(row)">
+                  ⋯
+                  <span class="sr-only">更多</span>
+                </button>
+              </div>
             </div>
             <div class="status-cell">
               <span v-if="row.rowType === 'task'" class="status-pill">
@@ -508,6 +616,23 @@ onMounted(() => {
       :submit-error="stepSubmitError"
       @close="closeTaskSteps"
       @submit="handleAddStep"
+    />
+    <EditRowModal
+      :visible="editModalVisible"
+      :row="editModalRow"
+      :loading="editModalLoading"
+      :error="editModalError"
+      @close="closeEditModal"
+      @submit="handleEditSubmit"
+    />
+    <MoreRowModal
+      :visible="moreModalVisible"
+      :row="moreModalRow"
+      :loading="moreModalLoading"
+      :error="moreModalError"
+      @close="closeMoreModal"
+      @delete="handleMoreDelete"
+      @update="handleMoreUpdate"
     />
     <AddNodeModal
       :visible="addModalVisible"
@@ -733,6 +858,59 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.add-label {
+  display: inline;
+}
+
+.add-icon {
+  display: none;
+}
+
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: 0.4rem;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.icon-button {
+  border: none;
+  background: #f1f5f9;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.table-row:hover .row-actions {
+  opacity: 1;
+  visibility: visible;
+}
+
+.table-row:hover .add-label {
+  display: none;
+}
+
+.table-row:hover .add-icon {
+  display: inline;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
 
 .steps-button {
