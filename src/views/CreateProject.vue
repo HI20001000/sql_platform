@@ -572,16 +572,16 @@ onMounted(() => {
               >
                 查看步驟
               </button>
-              <button
-                v-else
-                class="add-button"
-                type="button"
-                @click.stop="handleRowAdd(row)"
-              >
-                <span class="add-label">+ 新增</span>
-                <span class="add-icon">+</span>
-              </button>
               <div class="row-actions">
+                <button
+                  v-if="row.rowType !== 'task'"
+                  class="icon-button"
+                  type="button"
+                  @click.stop="handleRowAdd(row)"
+                >
+                  +
+                  <span class="sr-only">新增</span>
+                </button>
                 <button class="icon-button" type="button" @click.stop="openEditModal(row)">
                   ✏️
                   <span class="sr-only">編輯</span>
@@ -860,14 +860,6 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 
-.add-label {
-  display: inline;
-}
-
-.add-icon {
-  display: none;
-}
-
 .row-actions {
   display: inline-flex;
   align-items: center;
@@ -892,14 +884,6 @@ onMounted(() => {
 .table-row:hover .row-actions {
   opacity: 1;
   visibility: visible;
-}
-
-.table-row:hover .add-label {
-  display: none;
-}
-
-.table-row:hover .add-icon {
-  display: inline;
 }
 
 .sr-only {
@@ -940,24 +924,6 @@ onMounted(() => {
   border-radius: 999px;
   font-size: 0.8rem;
   cursor: pointer;
-}
-
-.add-button {
-  border: 1px dashed #cbd5f5;
-  background: #f8fafc;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  color: #475569;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.table-row:hover .add-button {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .status-cell {
