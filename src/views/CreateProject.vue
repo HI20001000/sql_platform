@@ -67,7 +67,8 @@ const hasActiveFilters = computed(
     assigneeFilters.value.length > 0
 )
 
-const isExpanded = (id) => expandedMap.value.has(id)
+const rowKey = (rowType, id) => `${rowType}:${id}`
+const isExpanded = (row) => expandedMap.value.has(rowKey(row.rowType, row.id))
 const canToggle = (row) => row.rowType !== 'task' && row.hasChildren
 
 const addModalConfig = computed(() => {
@@ -162,7 +163,7 @@ const visibleRows = computed(() => {
       if (visited.has(nodeKey)) return
       visited.add(nodeKey)
       output.push(product)
-      if (expandedMap.value.has(product.id)) {
+      if (expandedMap.value.has(rowKey('product', product.id))) {
         walkTasks(product.id, depth + 1)
       }
     })
@@ -173,7 +174,7 @@ const visibleRows = computed(() => {
     if (visited.has(nodeKey)) return
     visited.add(nodeKey)
     output.push(project)
-    if (expandedMap.value.has(project.id)) {
+    if (expandedMap.value.has(rowKey('project', project.id))) {
       walkProducts(project.id, 1)
     }
   })
@@ -208,11 +209,12 @@ const depthPadding = (depth) => `${depth * 24}px`
 
 const toggleExpanded = (row) => {
   if (!canToggle(row)) return
+  const key = rowKey(row.rowType, row.id)
   const next = new Set(expandedMap.value)
-  if (next.has(row.id)) {
-    next.delete(row.id)
+  if (next.has(key)) {
+    next.delete(key)
   } else {
-    next.add(row.id)
+    next.add(key)
   }
   expandedMap.value = next
 }
@@ -221,20 +223,20 @@ const resetExpandedMap = (data) => {
   const next = new Set()
   if (hasActiveFilters.value) {
     data.forEach((row) => {
-      if (row.rowType !== 'task') next.add(row.id)
+      if (row.rowType !== 'task') next.add(rowKey(row.rowType, row.id))
     })
   }
   expandedMap.value = next
 }
 
-const applyTreeResponse = (response, expandIds = [], { preserveExpanded = false } = {}) => {
+const applyTreeResponse = (response, expandKeys = [], { preserveExpanded = false } = {}) => {
   rows.value = normalizeRows(response.rows || [])
   taskCount.value = response.taskCount || 0
   if (!preserveExpanded) {
     resetExpandedMap(rows.value)
-    if (expandIds.length > 0) {
+    if (expandKeys.length > 0) {
       const next = new Set(expandedMap.value)
-      expandIds.forEach((id) => next.add(id))
+      expandKeys.forEach((key) => next.add(key))
       expandedMap.value = next
     }
   }
@@ -284,7 +286,7 @@ const handleAddSubmit = async (name) => {
   const createdBy = user?.username || user?.mail || 'system'
   try {
     let response = null
-    let expandIds = []
+    let expandKeys = []
     if (addModalType.value === 'project') {
       response = await createProject({
         name,
@@ -299,7 +301,7 @@ const handleAddSubmit = async (name) => {
         created_by: createdBy,
         ...buildFilterPayload(),
       })
-      if (projectId) expandIds = [projectId]
+      if (projectId) expandKeys = [rowKey('project', projectId)]
     } else if (addModalType.value === 'task') {
       const productId = addModalParent.value?.id
       response = await createTask({
@@ -311,10 +313,13 @@ const handleAddSubmit = async (name) => {
         ...buildFilterPayload(),
       })
       const projectId = addModalParent.value?.parentId
-      expandIds = [productId, projectId].filter(Boolean)
+      expandKeys = [
+        productId ? rowKey('product', productId) : null,
+        projectId ? rowKey('project', projectId) : null,
+      ].filter(Boolean)
     }
     if (response) {
-      applyTreeResponse(response, expandIds, { preserveExpanded: true })
+      applyTreeResponse(response, expandKeys, { preserveExpanded: true })
     }
     closeAddModal()
   } catch (err) {
@@ -557,7 +562,7 @@ onMounted(() => {
                 type="button"
                 @click.stop="toggleExpanded(row)"
               >
-                {{ isExpanded(row.id) ? '▾' : '▸' }}
+                {{ isExpanded(row) ? '▾' : '▸' }}
               </button>
               <span v-else class="toggle-spacer" aria-hidden="true"></span>
               <span class="type-tag" :class="`type-tag--${row.rowType}`">
