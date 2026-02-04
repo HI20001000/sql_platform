@@ -211,10 +211,6 @@ const resetExpandedMap = (data) => {
     data.forEach((row) => {
       if (row.rowType !== 'task') next.add(row.id)
     })
-  } else {
-    data.forEach((row) => {
-      if (row.rowType === 'project' && row.hasChildren) next.add(row.id)
-    })
   }
   expandedMap.value = next
 }
