@@ -547,8 +547,6 @@ onMounted(() => {
             v-for="row in visibleRows"
             :key="`${row.rowType}-${row.id}`"
             class="table-row"
-            :class="{ clickable: row.rowType === 'task' }"
-            @click="row.rowType === 'task' ? openTaskSteps(row) : null"
           >
             <div class="name-cell" :style="{ paddingLeft: depthPadding(row.level) }">
               <button
@@ -788,14 +786,6 @@ onMounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   font-size: 0.85rem;
-}
-
-.table-row.clickable {
-  cursor: pointer;
-}
-
-.table-row.clickable:hover {
-  background: #f8fafc;
 }
 
 .name-cell {
