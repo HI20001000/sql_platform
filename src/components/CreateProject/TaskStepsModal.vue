@@ -15,6 +15,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  statuses: {
+    type: Array,
+    default: () => [],
+  },
   users: {
     type: Array,
     default: () => [],
@@ -79,10 +83,21 @@ const resolveAssigneeLabel = (assigneeId) => {
   return user?.username || user?.mail || assigneeId
 }
 
+const resolveStatus = (statusId) => {
+  if (statusId == null) {
+    return { name: '-', color: '#e2e8f0' }
+  }
+  const status = props.statuses.find((entry) => String(entry.id) === String(statusId))
+  return status
+    ? { name: status.name, color: status.color }
+    : { name: '-', color: '#e2e8f0' }
+}
+
 const resolvedAssignees = computed(() => {
   return props.steps.map((step) => ({
     ...step,
     assigneeLabel: resolveAssigneeLabel(step.assignee_user_id),
+    statusMeta: resolveStatus(step.status_id),
   }))
 })
 </script>
@@ -104,6 +119,7 @@ const resolvedAssignees = computed(() => {
         <div v-else-if="steps.length === 0" class="modal-state">目前沒有步驟資料。</div>
           <div v-else class="steps-grid">
           <div class="steps-row steps-row--head">
+            <span>狀態</span>
             <span>負責人</span>
             <span>內容</span>
             <span>建立者</span>
@@ -111,6 +127,11 @@ const resolvedAssignees = computed(() => {
             <span>操作</span>
           </div>
           <div v-for="step in resolvedAssignees" :key="step.id" class="steps-row">
+            <span>
+              <span class="status-pill" :style="{ backgroundColor: step.statusMeta.color }">
+                {{ step.statusMeta.name }}
+              </span>
+            </span>
             <span>{{ step.assigneeLabel }}</span>
             <span class="step-content">{{ step.content }}</span>
             <span>{{ step.created_by || '-' }}</span>
@@ -326,7 +347,7 @@ const resolvedAssignees = computed(() => {
 
 .steps-row {
   display: grid;
-  grid-template-columns: 1fr 2.2fr 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr 2.2fr 1fr 1fr auto;
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 0.5rem;

@@ -737,6 +737,7 @@ onMounted(() => {
       :task="currentTask"
       :steps="stepsData"
       :users="userOptions"
+      :statuses="statusOptions"
       :active-menu-id="activeMenuId"
       :menu-id="stepAssigneeMenuId"
       :loading="stepsLoading"
