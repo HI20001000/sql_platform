@@ -72,7 +72,7 @@ const handleSubmit = () => {
         <button class="close-button" type="button" @click="handleClose">✕</button>
       </header>
 
-      <div class="modal-body">
+      <div class="modal-body">        
         <div v-if="loading" class="modal-state">正在載入步驟...</div>
         <div v-else-if="error" class="modal-state modal-state--error">{{ error }}</div>
         <div v-else-if="steps.length === 0" class="modal-state">目前沒有步驟資料。</div>
@@ -138,6 +138,7 @@ const handleSubmit = () => {
   border-radius: 16px;
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
   overflow: hidden;
+  color: black;
 }
 
 .modal-header {
@@ -276,6 +277,8 @@ const handleSubmit = () => {
 .steps-grid {
   display: grid;
   gap: 0.75rem;
+  overflow: auto;
+  max-height: 300px;
 }
 
 .steps-row {
