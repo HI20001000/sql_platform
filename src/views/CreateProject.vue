@@ -227,14 +227,16 @@ const resetExpandedMap = (data) => {
   expandedMap.value = next
 }
 
-const applyTreeResponse = (response, expandIds = []) => {
+const applyTreeResponse = (response, expandIds = [], { preserveExpanded = false } = {}) => {
   rows.value = normalizeRows(response.rows || [])
   taskCount.value = response.taskCount || 0
-  resetExpandedMap(rows.value)
-  if (expandIds.length > 0) {
-    const next = new Set(expandedMap.value)
-    expandIds.forEach((id) => next.add(id))
-    expandedMap.value = next
+  if (!preserveExpanded) {
+    resetExpandedMap(rows.value)
+    if (expandIds.length > 0) {
+      const next = new Set(expandedMap.value)
+      expandIds.forEach((id) => next.add(id))
+      expandedMap.value = next
+    }
   }
 }
 
@@ -245,12 +247,12 @@ const buildFilterPayload = () => ({
   includeEmpty: true,
 })
 
-const loadTree = async () => {
+const loadTree = async ({ preserveExpanded = false } = {}) => {
   loading.value = true
   error.value = ''
   try {
     const response = await fetchProjectTree(buildFilterPayload())
-    applyTreeResponse(response)
+    applyTreeResponse(response, [], { preserveExpanded })
   } catch (err) {
     error.value = err?.message || '載入失敗'
     rows.value = []
@@ -312,7 +314,7 @@ const handleAddSubmit = async (name) => {
       expandIds = [productId, projectId].filter(Boolean)
     }
     if (response) {
-      applyTreeResponse(response, expandIds)
+      applyTreeResponse(response, expandIds, { preserveExpanded: true })
     }
     closeAddModal()
   } catch (err) {
@@ -382,7 +384,7 @@ const handleEditSubmit = async (name) => {
       name,
     })
     closeEditModal()
-    await loadTree()
+    await loadTree({ preserveExpanded: true })
   } catch (err) {
     editModalError.value = err?.message || '更新失敗'
   } finally {
@@ -415,7 +417,7 @@ const handleMoreDelete = async () => {
       id: moreModalRow.value.id,
     })
     closeMoreModal()
-    await loadTree()
+    await loadTree({ preserveExpanded: true })
   } catch (err) {
     moreModalError.value = err?.message || '刪除失敗'
   } finally {
@@ -435,7 +437,7 @@ const handleMoreUpdate = async ({ status, assignee_user_id }) => {
       assignee_user_id,
     })
     closeMoreModal()
-    await loadTree()
+    await loadTree({ preserveExpanded: true })
   } catch (err) {
     moreModalError.value = err?.message || '更新失敗'
   } finally {
