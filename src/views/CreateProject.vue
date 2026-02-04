@@ -7,6 +7,7 @@ import {
   createProduct,
   createProject,
   createTask,
+  createTaskStep,
   fetchProjectTree,
   fetchTaskSteps,
 } from '../scripts/CreateProject/api.js'
@@ -27,6 +28,8 @@ const currentTask = ref(null)
 const stepsLoading = ref(false)
 const stepsError = ref('')
 const stepsData = ref([])
+const stepSubmitLoading = ref(false)
+const stepSubmitError = ref('')
 
 const addModalVisible = ref(false)
 const addModalType = ref('project')
@@ -78,27 +81,91 @@ const addModalConfig = computed(() => {
   }
 })
 
+const MAX_TREE_DEPTH = 20
+
+const normalizeRows = (data) => {
+  const rawRows = Array.isArray(data) ? data : []
+  const normalized = rawRows.map((row) => ({ ...row }))
+  const childCounts = new Map()
+
+  normalized.forEach((row) => {
+    const parentId = row.parentId ?? null
+    if (parentId !== null && parentId !== undefined) {
+      childCounts.set(parentId, (childCounts.get(parentId) || 0) + 1)
+    }
+  })
+
+  normalized.forEach((row) => {
+    if (row.parentId === row.id) {
+      // Root cause note: product rows returned after creation sometimes self-reference
+      // parentId === id, forming a cycle that made the generic parent walk() recurse forever.
+      row.parentId = null
+    }
+    const expectedLevel =
+      row.rowType === 'project' ? 0 : row.rowType === 'product' ? 1 : row.rowType === 'task' ? 2 : row.level
+    row.level = expectedLevel
+    row.hasChildren = row.rowType !== 'task' && (childCounts.get(row.id) || 0) > 0
+  })
+
+  return normalized
+}
+
 const visibleRows = computed(() => {
   if (!rows.value.length) return []
-  const byParent = new Map()
+
+  const projects = rows.value.filter((row) => row.rowType === 'project')
+  const productsByProject = new Map()
+  const tasksByProduct = new Map()
+
   rows.value.forEach((row) => {
-    const key = row.parentId ?? 'root'
-    if (!byParent.has(key)) byParent.set(key, [])
-    byParent.get(key).push(row)
+    if (row.rowType === 'product') {
+      const key = row.parentId ?? 'root'
+      if (!productsByProject.has(key)) productsByProject.set(key, [])
+      productsByProject.get(key).push(row)
+    } else if (row.rowType === 'task') {
+      const key = row.parentId ?? 'root'
+      if (!tasksByProduct.has(key)) tasksByProduct.set(key, [])
+      tasksByProduct.get(key).push(row)
+    }
   })
 
   const output = []
-  const walk = (parentKey) => {
-    const children = byParent.get(parentKey) || []
-    children.forEach((child) => {
-      output.push(child)
-      if (expandedMap.value.has(child.id)) {
-        walk(child.id)
+  const visited = new Set()
+  const walkTasks = (productId, depth) => {
+    if (depth > MAX_TREE_DEPTH) return
+    const tasks = tasksByProduct.get(productId) || []
+    tasks.forEach((task) => {
+      const nodeKey = `${task.rowType}:${task.id}`
+      if (visited.has(nodeKey)) return
+      visited.add(nodeKey)
+      output.push(task)
+    })
+  }
+
+  const walkProducts = (projectId, depth) => {
+    if (depth > MAX_TREE_DEPTH) return
+    const products = productsByProject.get(projectId) || []
+    products.forEach((product) => {
+      const nodeKey = `${product.rowType}:${product.id}`
+      if (visited.has(nodeKey)) return
+      visited.add(nodeKey)
+      output.push(product)
+      if (expandedMap.value.has(product.id)) {
+        walkTasks(product.id, depth + 1)
       }
     })
   }
 
-  walk('root')
+  projects.forEach((project) => {
+    const nodeKey = `${project.rowType}:${project.id}`
+    if (visited.has(nodeKey)) return
+    visited.add(nodeKey)
+    output.push(project)
+    if (expandedMap.value.has(project.id)) {
+      walkProducts(project.id, 1)
+    }
+  })
+
   return output
 })
 
@@ -144,16 +211,12 @@ const resetExpandedMap = (data) => {
     data.forEach((row) => {
       if (row.rowType !== 'task') next.add(row.id)
     })
-  } else {
-    data.forEach((row) => {
-      if (row.rowType === 'project' && row.hasChildren) next.add(row.id)
-    })
   }
   expandedMap.value = next
 }
 
 const applyTreeResponse = (response, expandIds = []) => {
-  rows.value = response.rows || []
+  rows.value = normalizeRows(response.rows || [])
   taskCount.value = response.taskCount || 0
   resetExpandedMap(rows.value)
   if (expandIds.length > 0) {
@@ -262,6 +325,7 @@ const openTaskSteps = async (row) => {
   stepsLoading.value = true
   stepsError.value = ''
   stepsData.value = []
+  stepSubmitError.value = ''
   try {
     const response = await fetchTaskSteps(row.id)
     stepsData.value = response.steps || []
@@ -278,6 +342,30 @@ const closeTaskSteps = () => {
   stepsData.value = []
   stepsError.value = ''
   stepsLoading.value = false
+  stepSubmitError.value = ''
+  stepSubmitLoading.value = false
+}
+
+const handleAddStep = async ({ content, assignee_user_id }) => {
+  if (!currentTask.value?.id) return
+  stepSubmitLoading.value = true
+  stepSubmitError.value = ''
+  const user = getCurrentUser()
+  try {
+    const response = await createTaskStep({
+      taskId: currentTask.value.id,
+      content,
+      assignee_user_id,
+      created_by: user?.username || user?.mail || 'system',
+    })
+    if (response?.step) {
+      stepsData.value = [...stepsData.value, response.step]
+    }
+  } catch (err) {
+    stepSubmitError.value = err?.message || '新增步驟失敗'
+  } finally {
+    stepSubmitLoading.value = false
+  }
 }
 
 let debounceTimer = null
@@ -374,6 +462,7 @@ onMounted(() => {
               >
                 {{ isExpanded(row.id) ? '▾' : '▸' }}
               </button>
+              <span v-else class="toggle-spacer" aria-hidden="true"></span>
               <span class="type-tag" :class="`type-tag--${row.rowType}`">
                 {{ formatTypeLabel(row.rowType) }}
               </span>
@@ -415,7 +504,10 @@ onMounted(() => {
       :steps="stepsData"
       :loading="stepsLoading"
       :error="stepsError"
+      :submit-loading="stepSubmitLoading"
+      :submit-error="stepSubmitError"
       @close="closeTaskSteps"
+      @submit="handleAddStep"
     />
     <AddNodeModal
       :visible="addModalVisible"
@@ -595,9 +687,15 @@ onMounted(() => {
 .toggle-button {
   border: none;
   background: transparent;
-  font-size: 1rem;
+  font-size: 1.2rem;
   color: #64748b;
   cursor: pointer;
+}
+
+.toggle-spacer {
+  display: inline-block;
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .type-tag {
