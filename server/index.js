@@ -16,7 +16,11 @@ import {
   updateProductName,
   updateProjectName,
   updateTaskFields,
+<<<<<<< HEAD
 } from '../scripts/CreateProject/index.js'
+=======
+} from '../src/scripts/CreateProject/index.js'
+>>>>>>> origin/codex/fix-infinite-recursion-in-walk-function-ihw2uo
 let createLogger = null
 let createSqlAuditWrapper = null
 let mysql = null
