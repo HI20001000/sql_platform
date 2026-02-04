@@ -623,9 +623,11 @@ const resolveStatusId = async (value) => {
 const normalizeAssigneeId = (value) => {
   if (value === undefined) return undefined
   if (value === null || value === '') return null
-  const normalized = Number(value)
-  if (Number.isNaN(normalized)) return null
-  return normalized
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  if (Number.isNaN(parsed)) return null
+  return parsed
 }
 
 const start = async () => {
