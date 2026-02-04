@@ -75,7 +75,7 @@ const logger = createLogger()
 
 const withCors = (res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS,PUT,PATCH,DELETE')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
@@ -594,11 +594,17 @@ const start = async () => {
       await addTaskStep(req, res)
       return
     }
-    if (url.pathname === '/api/create-project/update-row' && req.method === 'POST') {
+    if (
+      url.pathname === '/api/create-project/update-row' &&
+      ['POST', 'PUT', 'PATCH'].includes(req.method)
+    ) {
       await updateRow(req, res)
       return
     }
-    if (url.pathname === '/api/create-project/delete-row' && req.method === 'POST') {
+    if (
+      url.pathname === '/api/create-project/delete-row' &&
+      ['POST', 'DELETE'].includes(req.method)
+    ) {
       await deleteRow(req, res)
       return
     }
