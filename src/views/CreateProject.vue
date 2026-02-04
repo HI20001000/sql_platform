@@ -1,16 +1,21 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import AddNodeModal from '../components/CreateProject/AddNodeModal.vue'
+import AssigneeDropdown from '../components/CreateProject/AssigneeDropdown.vue'
 import EditRowModal from '../components/CreateProject/EditRowModal.vue'
 import MoreRowModal from '../components/CreateProject/MoreRowModal.vue'
+import StatusDropdown from '../components/CreateProject/StatusDropdown.vue'
 import TaskStepsModal from '../components/CreateProject/TaskStepsModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
+  createStatus,
   createProduct,
   createProject,
   createTask,
   createTaskStep,
   deleteRow,
+  fetchStatuses,
+  fetchUsers,
   fetchProjectTree,
   fetchTaskSteps,
   updateRow,
@@ -24,6 +29,9 @@ const rows = ref([])
 const taskCount = ref(0)
 const loading = ref(false)
 const error = ref('')
+const statusOptions = ref([])
+const userOptions = ref([])
+const metaError = ref('')
 
 const expandedMap = ref(new Set())
 
@@ -59,6 +67,7 @@ const parseTokens = (value) => {
 
 const statusFilters = computed(() => parseTokens(statusInput.value))
 const assigneeFilters = computed(() => parseTokens(assigneeInput.value))
+const defaultStatusId = computed(() => statusOptions.value[0]?.id ?? null)
 
 const hasActiveFilters = computed(
   () =>
@@ -270,6 +279,17 @@ const loadTree = async ({ preserveExpanded = false } = {}) => {
   }
 }
 
+const loadMeta = async () => {
+  metaError.value = ''
+  try {
+    const [statusResponse, userResponse] = await Promise.all([fetchStatuses(), fetchUsers()])
+    statusOptions.value = statusResponse.statuses || []
+    userOptions.value = userResponse.users || []
+  } catch (err) {
+    metaError.value = err?.message || '載入狀態或使用者資料失敗'
+  }
+}
+
 const openAddModal = ({ type, parent }) => {
   addModalType.value = type
   addModalParent.value = parent || null
@@ -313,7 +333,7 @@ const handleAddSubmit = async (name) => {
       response = await createTask({
         productId,
         title: name,
-        current_status: 'todo',
+        status_id: defaultStatusId.value,
         created_by: createdBy,
         assignee_user_id: user?.mail || null,
         ...buildFilterPayload(),
@@ -468,6 +488,7 @@ const handleAddStep = async ({ content, assignee_user_id }) => {
       content,
       assignee_user_id,
       created_by: user?.username || user?.mail || 'system',
+      status_id: defaultStatusId.value,
     })
     if (response?.step && currentTask.value?.id === taskId) {
       stepsData.value = [...stepsData.value, response.step]
@@ -476,6 +497,61 @@ const handleAddStep = async ({ content, assignee_user_id }) => {
     stepSubmitError.value = err?.message || '新增步驟失敗'
   } finally {
     stepSubmitLoading.value = false
+  }
+}
+
+const handleStatusSelect = async (row, status) => {
+  if (!row || row.rowType !== 'task') return
+  try {
+    await updateRow({
+      rowType: row.rowType,
+      id: row.id,
+      status_id: status.id,
+    })
+    rows.value = rows.value.map((item) =>
+      item.id === row.id && item.rowType === 'task'
+        ? {
+            ...item,
+            status: status.name,
+            status_id: status.id,
+            status_color: status.color,
+          }
+        : item
+    )
+  } catch (err) {
+    error.value = err?.message || '更新狀態失敗'
+  }
+}
+
+const handleStatusCreate = async ({ name, color }) => {
+  try {
+    const response = await createStatus({ name, color })
+    if (response?.status) {
+      statusOptions.value = [...statusOptions.value, response.status]
+    }
+  } catch (err) {
+    error.value = err?.message || '新增狀態失敗'
+  }
+}
+
+const handleAssigneeSelect = async (row, user) => {
+  if (!row || row.rowType !== 'task') return
+  try {
+    await updateRow({
+      rowType: row.rowType,
+      id: row.id,
+      assignee_user_id: user?.mail || null,
+    })
+    rows.value = rows.value.map((item) =>
+      item.id === row.id && item.rowType === 'task'
+        ? {
+            ...item,
+            assignee_user_id: user?.mail || null,
+          }
+        : item
+    )
+  } catch (err) {
+    error.value = err?.message || '更新負責人失敗'
   }
 }
 
@@ -489,6 +565,7 @@ watch([searchQuery, statusInput, assigneeInput], () => {
 
 onMounted(() => {
   loadTree()
+  loadMeta()
 })
 </script>
 
@@ -606,12 +683,26 @@ onMounted(() => {
               </div>
             </div>
             <div class="status-cell">
-              <span v-if="row.rowType === 'task'" class="status-pill">
-                {{ row.status || '-' }}
-              </span>
+              <StatusDropdown
+                v-if="row.rowType === 'task'"
+                :status-id="row.status_id"
+                :status-name="row.status"
+                :status-color="row.status_color"
+                :statuses="statusOptions"
+                @select="(status) => handleStatusSelect(row, status)"
+                @create="handleStatusCreate"
+              />
               <span v-else class="status-muted">-</span>
             </div>
-            <div>{{ row.rowType === 'task' ? row.assignee_user_id ?? '-' : '-' }}</div>
+            <div>
+              <AssigneeDropdown
+                v-if="row.rowType === 'task'"
+                :assignee-id="row.assignee_user_id"
+                :users="userOptions"
+                @select="(user) => handleAssigneeSelect(row, user)"
+              />
+              <span v-else>-</span>
+            </div>
             <div>{{ row.updated_at }}</div>
             <div>{{ row.created_at }}</div>
           </div>
