@@ -6,16 +6,18 @@ export const updateProductName = async (connection, { productId, name }) => {
   await connection.query(`UPDATE products SET name = ? WHERE id = ?`, [name, productId])
 }
 
-export const updateTaskFields = async (connection, { taskId, title, status, assigneeUserId }) => {
+export const updateTaskFields = async (connection, { taskId, title, statusId, assigneeUserId }) => {
   const updates = []
   const values = []
   if (title !== undefined) {
     updates.push('title = ?')
     values.push(title)
   }
-  if (status !== undefined) {
+  if (statusId !== undefined) {
     updates.push('current_status = ?')
-    values.push(status)
+    updates.push('status_id = ?')
+    values.push(String(statusId ?? ''))
+    values.push(statusId)
   }
   if (assigneeUserId !== undefined) {
     updates.push('assignee_user_id = ?')
