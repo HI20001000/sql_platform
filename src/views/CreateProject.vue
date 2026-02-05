@@ -588,6 +588,14 @@ const handleAssigneeSelect = async (row, user) => {
   }
 }
 
+const resetFilters = () => {
+  searchQuery.value = ''
+  statusFilterId.value = null
+  assigneeFilterId.value = null
+  activeMenuId.value = null
+  loadTree()
+}
+
 let debounceTimer = null
 watch([searchQuery, statusFilterId, assigneeFilterId], () => {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -621,6 +629,9 @@ onMounted(() => {
             type="search"
             placeholder="全局模糊搜尋"
           />
+          <button class="reset-button" type="button" @click="resetFilters" aria-label="清空搜尋">
+            ⟲
+          </button>
         </div>
         <div class="filter-group">
           <label class="filter-field">
@@ -887,6 +898,23 @@ onMounted(() => {
   outline: none;
 }
 
+.reset-button {
+  border: none;
+  background: #e2e8f0;
+  color: #0f172a;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+}
+
+.reset-button:hover {
+  background: #cbd5f5;
+}
+
 .filter-group {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -894,17 +922,11 @@ onMounted(() => {
 }
 
 .filter-field {
-  display: grid;
-  gap: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   font-size: 0.85rem;
   color: #475569;
-}
-
-.filter-field input {
-  border: 1px solid #e2e8f0;
-  padding: 0.5rem 0.75rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
 }
 
 .task-count {
