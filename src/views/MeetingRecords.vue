@@ -353,18 +353,19 @@ onMounted(() => {
   min-height: 100vh;
   background: #f8fafc;
   color: #0f172a;
+  display: flex;
 }
 
 .content {
-  margin-left: 84px;
+  flex: 1;
   padding: 2rem 2.5rem 3rem;
+  width: 100%;
 }
 
 .page-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 2rem;
-  align-items: flex-start;
   margin-bottom: 2rem;
 }
 
@@ -379,8 +380,9 @@ onMounted(() => {
 }
 
 .header-actions {
-  display: grid;
+  display: flex;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .date-field {
@@ -437,6 +439,7 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 1.5rem;
+  width: 100%;
 }
 
 .tree-panel,
