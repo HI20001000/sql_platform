@@ -18,6 +18,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  allowCreate: {
+    type: Boolean,
+    default: true,
+  },
   menuId: {
     type: String,
     default: '',
@@ -106,22 +110,24 @@ onBeforeUnmount(() => {
         <span class="status-dot" :style="{ backgroundColor: status.color }"></span>
         <span>{{ status.name }}</span>
       </button>
-      <div class="status-divider"></div>
-      <button
-        v-if="!showCreate"
-        class="status-add"
-        type="button"
-        @click.stop="handleCreateToggle"
-      >
-        新增更多狀態
-      </button>
-      <div v-else class="status-create">
-        <input v-model="newName" type="text" placeholder="狀態名稱" />
-        <input v-model="newColor" type="color" />
-        <button class="status-create__button" type="button" @click.stop="handleCreate">
-          新增
+      <template v-if="allowCreate">
+        <div class="status-divider"></div>
+        <button
+          v-if="!showCreate"
+          class="status-add"
+          type="button"
+          @click.stop="handleCreateToggle"
+        >
+          新增更多狀態
         </button>
-      </div>
+        <div v-else class="status-create">
+          <input v-model="newName" type="text" placeholder="狀態名稱" />
+          <input v-model="newColor" type="color" />
+          <button class="status-create__button" type="button" @click.stop="handleCreate">
+            新增
+          </button>
+        </div>
+      </template>
     </div>
   </div>
 </template>

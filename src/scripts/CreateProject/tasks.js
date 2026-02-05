@@ -16,7 +16,7 @@ export const fetchTasksWithParents = async (connection, { q, status, assignee } 
   }
 
   if (assignee?.length) {
-    conditions.push(`t.assignee_user_id IN (${assignee.map(() => '?').join(',')})`)
+    conditions.push(`u.username IN (${assignee.map(() => '?').join(',')})`)
     params.push(...assignee)
   }
 
@@ -53,6 +53,7 @@ export const fetchTasksWithParents = async (connection, { q, status, assignee } 
         pr.updated_at AS project_updated_at
      FROM tasks t
      LEFT JOIN statuses s ON s.id = t.status_id
+     LEFT JOIN users u ON u.id = t.assignee_user_id
      JOIN products p ON p.id = t.product_id
      JOIN projects pr ON pr.id = p.project_id
      ${whereClause}

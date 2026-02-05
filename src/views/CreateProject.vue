@@ -23,8 +23,8 @@ import {
 } from '../scripts/CreateProject/api.js'
 
 const searchQuery = ref('')
-const statusInput = ref('')
-const assigneeInput = ref('')
+const statusFilterId = ref(null)
+const assigneeFilterId = ref(null)
 
 const rows = ref([])
 const taskCount = ref(0)
@@ -60,16 +60,20 @@ const addModalParent = ref(null)
 const addModalLoading = ref(false)
 const addModalError = ref('')
 
-const parseTokens = (value) => {
-  if (!value) return []
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-const statusFilters = computed(() => parseTokens(statusInput.value))
-const assigneeFilters = computed(() => parseTokens(assigneeInput.value))
+const statusFilters = computed(() => {
+  if (!statusFilterId.value) return []
+  const status = statusOptions.value.find(
+    (entry) => String(entry.id) === String(statusFilterId.value)
+  )
+  return status?.name ? [status.name] : []
+})
+const assigneeFilters = computed(() => {
+  if (!assigneeFilterId.value) return []
+  const user = userOptions.value.find(
+    (entry) => String(entry.id) === String(assigneeFilterId.value)
+  )
+  return user?.username ? [user.username] : []
+})
 const defaultStatusId = computed(() => statusOptions.value[0]?.id ?? null)
 
 const hasActiveFilters = computed(
@@ -585,7 +589,7 @@ const handleAssigneeSelect = async (row, user) => {
 }
 
 let debounceTimer = null
-watch([searchQuery, statusInput, assigneeInput], () => {
+watch([searchQuery, statusFilterId, assigneeFilterId], () => {
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
     loadTree()
@@ -621,18 +625,29 @@ onMounted(() => {
         <div class="filter-group">
           <label class="filter-field">
             <span>狀態</span>
-            <input
-              v-model="statusInput"
-              type="text"
-              placeholder="狀態 (逗號分隔)"
+            <StatusDropdown
+              :status-id="statusFilterId"
+              :status-name="statusFilters[0] || '選擇狀態'"
+              :status-color="
+                statusOptions.find((entry) => String(entry.id) === String(statusFilterId))?.color
+              "
+              :statuses="statusOptions"
+              :allow-create="false"
+              :menu-id="'filter-status'"
+              :active-menu-id="activeMenuId"
+              @select="(status) => (statusFilterId = status.id)"
+              @toggle="setActiveMenu"
             />
           </label>
           <label class="filter-field">
             <span>負責人</span>
-            <input
-              v-model="assigneeInput"
-              type="text"
-              placeholder="負責人 ID (逗號分隔)"
+            <AssigneeDropdown
+              :assignee-id="assigneeFilterId"
+              :users="userOptions"
+              :menu-id="'filter-assignee'"
+              :active-menu-id="activeMenuId"
+              @select="(user) => (assigneeFilterId = user.id)"
+              @toggle="setActiveMenu"
             />
           </label>
         </div>
