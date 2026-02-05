@@ -12,6 +12,10 @@ onMounted(() => {
 const handleCreateProject = () => {
   router?.push('/projects/create')
 }
+
+const handleMeetingRecords = () => {
+  router?.push('/meetings')
+}
 </script>
 
 <template>
@@ -24,6 +28,9 @@ const handleCreateProject = () => {
     <div class="toolbar-section toolbar-section--middle" aria-label="主要操作">
       <button class="tool-button" type="button" aria-label="新增" @click="handleCreateProject">
         ➕
+      </button>
+      <button class="tool-button" type="button" aria-label="會議記錄" @click="handleMeetingRecords">
+        🗂️
       </button>
       <button class="tool-button" type="button" aria-label="編輯">✏️</button>
       <button class="tool-button" type="button" aria-label="刪除">🗑️</button>
