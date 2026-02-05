@@ -629,9 +629,6 @@ onMounted(() => {
             type="search"
             placeholder="全局模糊搜尋"
           />
-          <button class="reset-button" type="button" @click="resetFilters" aria-label="清空搜尋">
-            ⟲
-          </button>
         </div>
         <div class="filter-group">
           <label class="filter-field">
@@ -661,13 +658,15 @@ onMounted(() => {
               @toggle="setActiveMenu"
             />
           </label>
+          <label class="filter-field">
+            <button class="reset-button" type="button" @click="resetFilters" aria-label="清空搜尋">
+            ⟲
+            </button>
+          </label>        
         </div>
         <div class="toolbar-actions">
           <div class="task-count">任務總數：{{ taskCount }}</div>
         </div>
-        <button class="reset-button" type="button" @click="resetFilters" aria-label="清空搜尋">
-          ⟲
-        </button>
       </div>
 
       <div v-if="loading" class="state-card">資料載入中...</div>
@@ -928,11 +927,11 @@ onMounted(() => {
 }
 
 .filter-group {
-  display: grid;
+  display:flex;
+  justify-content: space-between;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
   padding: 0 1rem;
-  border-left: 1px solid #e2e8f0;
   border-right: 1px solid #e2e8f0;
 }
 
