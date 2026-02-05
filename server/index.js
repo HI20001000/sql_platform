@@ -1,7 +1,7 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
-import { URL } from 'node:url'
+import { URL, fileURLToPath } from 'node:url'
 import {
   buildProjectTreeRows,
   createProductNode,
@@ -12,6 +12,8 @@ import {
   deleteProductTree,
   deleteProjectTree,
   deleteTaskTree,
+  fetchProducts,
+  fetchProjects,
   fetchTaskStepsByTaskId,
   fetchStatuses,
   getConnection as getCreateProjectConnection,
@@ -21,6 +23,7 @@ import {
   updateProjectName,
   updateTaskFields,
 } from '../src/scripts/CreateProject/index.js'
+import { createMeetingHandlers } from './scripts/CreateMeeting/index.js'
 let createLogger = null
 let createSqlAuditWrapper = null
 let mysql = null
@@ -76,6 +79,7 @@ const {
 const DATABASE_NAME = MYSQL_DATABASE
 const TOKEN_TTL_MS = 60 * 60 * 1000
 const logger = createLogger()
+const MEETING_ROOT_PATH = fileURLToPath(new URL('../meeting_uploads', import.meta.url))
 
 const withCors = (res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -101,6 +105,16 @@ const parseBody = async (req) => {
     return null
   }
 }
+
+const meetingHandlers = createMeetingHandlers({
+  getConnection: getCreateProjectConnection,
+  fetchProjects,
+  fetchProducts,
+  sendJson,
+  parseBody,
+  logger,
+  meetingRootPath: MEETING_ROOT_PATH,
+})
 
 const createConnection = async (withDatabase = false) => {
   if (!mysql) {
@@ -142,6 +156,7 @@ const ensureTables = async (connection) => {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`)
 }
+
 
 const seedDefaultUser = async (connection) => {
   const [rows] = await connection.query('SELECT COUNT(*) as count FROM users')
@@ -619,6 +634,7 @@ const addStatus = async (req, res) => {
   }
 }
 
+
 const listUsers = async (_req, res) => {
   try {
     const connection = await getConnection()
@@ -656,6 +672,7 @@ const normalizeAssigneeId = (value) => {
   if (Number.isNaN(parsed)) return null
   return parsed
 }
+
 
 const start = async () => {
   const port = process.env.PORT || 3001
@@ -731,6 +748,47 @@ const start = async () => {
     }
     if (url.pathname === '/api/create-project/task' && req.method === 'POST') {
       await createTask(req, res)
+      return
+    }
+    if (url.pathname === '/api/meetings/tree' && req.method === 'GET') {
+      await meetingHandlers.fetchMeetingTree(req, res)
+      return
+    }
+    if (url.pathname === '/api/meetings/day' && req.method === 'POST') {
+      await meetingHandlers.createMeetingDay(req, res)
+      return
+    }
+    if (
+      url.pathname === '/api/meetings/day' &&
+      ['PUT', 'PATCH'].includes(req.method)
+    ) {
+      await meetingHandlers.renameMeetingDay(req, res)
+      return
+    }
+    if (
+      url.pathname === '/api/meetings/day' &&
+      ['DELETE'].includes(req.method)
+    ) {
+      await meetingHandlers.deleteMeetingDay(req, res)
+      return
+    }
+    if (url.pathname === '/api/meetings/files' && req.method === 'GET') {
+      await meetingHandlers.listMeetingFiles(req, res, url)
+      return
+    }
+    if (url.pathname === '/api/meetings/upload' && req.method === 'POST') {
+      await meetingHandlers.uploadMeetingFiles(req, res, url)
+      return
+    }
+    if (url.pathname === '/api/meetings/download' && req.method === 'GET') {
+      await meetingHandlers.downloadMeetingFile(req, res, url)
+      return
+    }
+    if (
+      url.pathname === '/api/meetings/file' &&
+      ['DELETE'].includes(req.method)
+    ) {
+      await meetingHandlers.deleteMeetingFile(req, res)
       return
     }
     if (url.pathname === '/api/users' && req.method === 'GET') {
