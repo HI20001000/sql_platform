@@ -209,36 +209,6 @@ onMounted(() => {
           <h1>會議記錄</h1>
           <p>依產品與日期管理會議記錄檔案。</p>
         </div>
-        <div class="header-actions">
-          <div class="date-field">
-            <label>
-              新增日期
-              <input v-model="newMeetingDate" type="date" />
-            </label>
-            <button
-              type="button"
-              class="primary-button"
-              :disabled="!selectedProductId || !newMeetingDate"
-              @click="handleCreateDay"
-            >
-              新增資料夾
-            </button>
-          </div>
-          <div class="date-field">
-            <label>
-              重新命名
-              <input v-model="renameMeetingDate" type="date" />
-            </label>
-            <button
-              type="button"
-              class="ghost-button"
-              :disabled="!selectedDayId || !renameMeetingDate"
-              @click="handleRenameDay"
-            >
-              更新日期
-            </button>
-          </div>
-        </div>
       </header>
 
       <div class="layout">
@@ -277,13 +247,6 @@ onMounted(() => {
                       >
                         🗓️ {{ day.meeting_date }}
                       </button>
-                      <button
-                        type="button"
-                        class="tree-day-delete"
-                        @click.stop="handleDeleteDay(day)"
-                      >
-                        刪除
-                      </button>
                     </div>
                     <div v-if="product.meeting_days.length === 0" class="tree-empty">
                       尚未新增日期
@@ -299,6 +262,44 @@ onMounted(() => {
         <main class="files-panel">
           <div class="panel-title">會議文件</div>
           <div class="upload-bar">
+            <div class="header-actions">
+              <div class="date-field">
+                <label>
+                  新增日期
+                  <input v-model="newMeetingDate" type="date" />
+                </label>
+                <button
+                  type="button"
+                  class="primary-button"
+                  :disabled="!selectedProductId || !newMeetingDate"
+                  @click="handleCreateDay"
+                >
+                  新增資料夾
+                </button>
+              </div>
+              <div class="date-field">
+                <label>
+                  重新命名
+                  <input v-model="renameMeetingDate" type="date" />
+                </label>
+                <button
+                  type="button"
+                  class="ghost-button"
+                  :disabled="!selectedDayId || !renameMeetingDate"
+                  @click="handleRenameDay"
+                >
+                  更新日期
+                </button>
+              </div>
+              <button
+                type="button"
+                class="tree-day-delete"
+                :disabled="!selectedDayId"
+                @click="handleDeleteDay(selectedMeetingDay)"
+              >
+                刪除日期
+              </button>
+            </div>
             <input
               type="file"
               multiple
