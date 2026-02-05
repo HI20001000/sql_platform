@@ -61,6 +61,13 @@ export const updateRow = async ({ rowType, id, name, status, status_id, assignee
   })
 }
 
+export const updateTaskStepStatus = async ({ stepId, status_id }) => {
+  return requestJson(`${apiBaseUrl}/api/create-project/task-step-status`, {
+    stepId,
+    status_id,
+  })
+}
+
 export const deleteRow = async ({ rowType, id }) => {
   return requestJson(`${apiBaseUrl}/api/create-project/delete-row`, {
     rowType,

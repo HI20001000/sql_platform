@@ -18,6 +18,7 @@ import {
   fetchUsers,
   fetchProjectTree,
   fetchTaskSteps,
+  updateTaskStepStatus,
   updateRow,
 } from '../scripts/CreateProject/api.js'
 
@@ -512,6 +513,18 @@ const handleAddStep = async ({ content, assignee_user_id }) => {
   }
 }
 
+const handleStepStatusUpdate = async ({ step, status }) => {
+  if (!step?.id || !status?.id) return
+  try {
+    const response = await updateTaskStepStatus({ stepId: step.id, status_id: status.id })
+    if (response?.step) {
+      stepsData.value = stepsData.value.map((item) => (item.id === step.id ? response.step : item))
+    }
+  } catch (err) {
+    stepSubmitError.value = err?.message || '更新步驟狀態失敗'
+  }
+}
+
 const handleStatusSelect = async (row, status) => {
   if (!row || row.rowType !== 'task') return
   try {
@@ -746,6 +759,8 @@ onMounted(() => {
       :submit-error="stepSubmitError"
       @close="closeTaskSteps"
       @submit="handleAddStep"
+      @update-step-status="handleStepStatusUpdate"
+      @create-status="handleStatusCreate"
       @toggle="setActiveMenu"
     />
     <EditRowModal

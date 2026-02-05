@@ -16,6 +16,7 @@ import {
   fetchStatuses,
   getConnection as getCreateProjectConnection,
   getDefaultStatusId,
+  updateTaskStepStatus,
   updateProductName,
   updateProjectName,
   updateTaskFields,
@@ -411,6 +412,32 @@ const addTaskStep = async (req, res) => {
   }
 }
 
+const updateTaskStepStatusHandler = async (req, res) => {
+  const body = await parseBody(req)
+  const stepId = body?.stepId
+  if (!stepId) {
+    sendJson(res, 400, { message: 'stepId is required' })
+    return
+  }
+  try {
+    const connection = await getCreateProjectConnection()
+    const statusId = await resolveStatusId(body?.status_id ?? body?.status)
+    if (statusId == null) {
+      sendJson(res, 400, { message: 'status_id is required' })
+      return
+    }
+    const [rows] = await connection.query(`SELECT name FROM statuses WHERE id = ? LIMIT 1`, [
+      statusId,
+    ])
+    const statusName = rows[0]?.name || ''
+    const step = await updateTaskStepStatus(connection, { stepId, statusId, statusName })
+    sendJson(res, 200, { step })
+  } catch (error) {
+    await logger.error(`Task step status update failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to update task step status' })
+  }
+}
+
 const updateRow = async (req, res) => {
   const body = await parseBody(req)
   const rowType = body?.rowType
@@ -666,6 +693,10 @@ const start = async () => {
     }
     if (url.pathname === '/api/create-project/task-step' && req.method === 'POST') {
       await addTaskStep(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/task-step-status' && req.method === 'POST') {
+      await updateTaskStepStatusHandler(req, res)
       return
     }
     if (url.pathname === '/api/create-project/statuses' && req.method === 'GET') {

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import AssigneeDropdown from './AssigneeDropdown.vue'
+import StatusDropdown from './StatusDropdown.vue'
 
 const props = defineProps({
   visible: {
@@ -49,7 +50,14 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['close', 'submit', 'delete-step', 'toggle'])
+const emit = defineEmits([
+  'close',
+  'submit',
+  'delete-step',
+  'toggle',
+  'update-step-status',
+  'create-status',
+])
 
 const contentInput = ref('')
 const assigneeInput = ref(null)
@@ -128,9 +136,17 @@ const resolvedAssignees = computed(() => {
           </div>
           <div v-for="step in resolvedAssignees" :key="step.id" class="steps-row">
             <span>
-              <span class="status-pill" :style="{ backgroundColor: step.statusMeta.color }">
-                {{ step.statusMeta.name }}
-              </span>
+              <StatusDropdown
+                :status-id="step.status_id"
+                :status-name="step.statusMeta.name"
+                :status-color="step.statusMeta.color"
+                :statuses="statuses"
+                :menu-id="`step-status-${step.id}`"
+                :active-menu-id="activeMenuId"
+                @select="(status) => emit('update-step-status', { step, status })"
+                @create="(payload) => emit('create-status', payload)"
+                @toggle="(value) => emit('toggle', value)"
+              />
             </span>
             <span>{{ step.assigneeLabel }}</span>
             <span class="step-content">{{ step.content }}</span>

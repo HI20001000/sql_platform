@@ -26,3 +26,18 @@ export const createTaskStep = async (
   )
   return rows[0]
 }
+
+export const updateTaskStepStatus = async (connection, { stepId, statusId, statusName }) => {
+  await connection.query(`UPDATE task_steps SET status_id = ?, status = ? WHERE id = ?`, [
+    statusId,
+    statusName,
+    stepId,
+  ])
+  const [rows] = await connection.query(
+    `SELECT id, task_id, status, status_id, content, assignee_user_id, created_by, created_at
+     FROM task_steps
+     WHERE id = ?`,
+    [stepId]
+  )
+  return rows[0]
+}
