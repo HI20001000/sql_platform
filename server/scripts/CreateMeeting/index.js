@@ -32,6 +32,11 @@ const parseBase64Payload = (payload) => {
   }
 }
 
+const sanitizeFilename = (name) => {
+  if (!name) return ''
+  return String(name).replace(/[\\\/:*?"<>|]+/g, '_')
+}
+
 export const createMeetingHandlers = ({
   getConnection,
   fetchProjects,
@@ -41,6 +46,22 @@ export const createMeetingHandlers = ({
   logger,
   meetingRootPath,
 }) => {
+  const ensureColumnLength = async (connection, table, column, minLength) => {
+    const [rows] = await connection.query(
+      `SELECT character_maximum_length AS maxLength
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         AND COLUMN_NAME = ?`,
+      [table, column]
+    )
+    const currentLength = rows[0]?.maxLength
+    if (!currentLength || currentLength >= minLength) return
+    await connection.query(
+      `ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` VARCHAR(${minLength}) NOT NULL`
+    )
+  }
+
   const ensureMeetingTables = async (connection) => {
     await connection.query(`CREATE TABLE IF NOT EXISTS meeting_days (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -56,12 +77,13 @@ export const createMeetingHandlers = ({
       meeting_day_id INT NOT NULL,
       filename VARCHAR(255) NOT NULL,
       storage_path VARCHAR(500) NOT NULL,
-      file_type VARCHAR(32) NOT NULL,
+      file_type VARCHAR(255) NOT NULL,
       file_size INT NOT NULL,
       uploaded_by VARCHAR(255) NOT NULL DEFAULT 'system',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_meeting_files_day (meeting_day_id)
     )`)
+    await ensureColumnLength(connection, 'meeting_files', 'file_type', 255)
   }
 
   const ensureMeetingStorage = async () => {
@@ -278,11 +300,27 @@ export const createMeetingHandlers = ({
       for (const file of files) {
         const parsed = parseBase64Payload(file?.content)
         if (!parsed?.buffer) continue
-        const originalName = String(file?.name || '')
+        const originalName = sanitizeFilename(file?.name || '')
         const ext = path.extname(originalName)
-        const storedName = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`
+        const baseName = originalName ? path.basename(originalName, ext) : ''
+        const fallbackName = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`
+        let storedName = originalName || fallbackName
+        let storedAbsolutePath = path.join(meetingRootPath, relativePath, storedName)
+        let attempt = 1
+        while (true) {
+          try {
+            await fs.access(storedAbsolutePath)
+            storedName = baseName
+              ? `${baseName}-${attempt}${ext}`
+              : `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`
+            storedAbsolutePath = path.join(meetingRootPath, relativePath, storedName)
+            attempt += 1
+          } catch (error) {
+            if (error?.code === 'ENOENT') break
+            throw error
+          }
+        }
         const storedRelativePath = path.posix.join(relativePath, storedName)
-        const storedAbsolutePath = path.join(meetingRootPath, storedRelativePath)
         await fs.writeFile(storedAbsolutePath, parsed.buffer)
         await connection.query(
           `INSERT INTO meeting_files (meeting_day_id, filename, storage_path, file_type, file_size, uploaded_by)
