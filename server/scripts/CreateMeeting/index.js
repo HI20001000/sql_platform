@@ -10,12 +10,6 @@ const normalizeMeetingDate = (value) => {
   return normalized
 }
 
-const resolveMeetingDayFolder = ({ meetingRootPath, productId, meetingDate }) => {
-  const relativePath = path.posix.join(String(productId), meetingDate)
-  const absolutePath = path.join(meetingRootPath, relativePath)
-  return { relativePath, absolutePath }
-}
-
 const parseBase64Payload = (payload) => {
   if (!payload) return null
   const normalized = String(payload)
@@ -37,6 +31,11 @@ const sanitizeFilename = (name) => {
   return String(name).replace(/[\\\/:*?"<>|]+/g, '_')
 }
 
+const sanitizeFolderName = (name) => {
+  if (!name) return ''
+  return String(name).trim().replace(/[\\\/:*?"<>|]+/g, '_')
+}
+
 export const createMeetingHandlers = ({
   getConnection,
   fetchProjects,
@@ -46,6 +45,23 @@ export const createMeetingHandlers = ({
   logger,
   meetingRootPath,
 }) => {
+  const getMeetingPathInfo = async (connection, productId, meetingDate) => {
+    const [rows] = await connection.query(
+      `SELECT pr.name AS project_name, p.name AS product_name
+       FROM products p
+       JOIN projects pr ON pr.id = p.project_id
+       WHERE p.id = ?
+       LIMIT 1`,
+      [productId]
+    )
+    if (!rows.length) return null
+    const projectName = sanitizeFolderName(rows[0].project_name)
+    const productName = sanitizeFolderName(rows[0].product_name)
+    const relativePath = path.posix.join(projectName, productName, meetingDate)
+    const absolutePath = path.join(meetingRootPath, relativePath)
+    return { projectName, productName, relativePath, absolutePath }
+  }
+
   const ensureMeetingTables = async (connection) => {
     await connection.query(`CREATE TABLE IF NOT EXISTS meeting_days (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -136,11 +152,12 @@ export const createMeetingHandlers = ({
         meetingDayId = result.insertId
       }
       await ensureMeetingStorage()
-      const { absolutePath } = resolveMeetingDayFolder({
-        meetingRootPath,
-        productId,
-        meetingDate,
-      })
+      const pathInfo = await getMeetingPathInfo(connection, productId, meetingDate)
+      if (!pathInfo) {
+        sendJson(res, 404, { message: 'Product not found' })
+        return
+      }
+      const { absolutePath } = pathInfo
       await fs.mkdir(absolutePath, { recursive: true })
       sendJson(res, 200, { id: meetingDayId, meeting_date: meetingDate })
     } catch (error) {
@@ -177,18 +194,18 @@ export const createMeetingHandlers = ({
         return
       }
       await ensureMeetingStorage()
-      const oldFolder = resolveMeetingDayFolder({
-        meetingRootPath,
-        productId,
-        meetingDate: oldMeetingDate,
-      })
-      const newFolder = resolveMeetingDayFolder({ meetingRootPath, productId, meetingDate })
-      await fs.mkdir(path.dirname(newFolder.absolutePath), { recursive: true })
+      const oldPathInfo = await getMeetingPathInfo(connection, productId, oldMeetingDate)
+      const newPathInfo = await getMeetingPathInfo(connection, productId, meetingDate)
+      if (!oldPathInfo || !newPathInfo) {
+        sendJson(res, 404, { message: 'Product not found' })
+        return
+      }
+      await fs.mkdir(path.dirname(newPathInfo.absolutePath), { recursive: true })
       try {
-        await fs.rename(oldFolder.absolutePath, newFolder.absolutePath)
+        await fs.rename(oldPathInfo.absolutePath, newPathInfo.absolutePath)
       } catch (error) {
         if (error?.code !== 'ENOENT') throw error
-        await fs.mkdir(newFolder.absolutePath, { recursive: true })
+        await fs.mkdir(newPathInfo.absolutePath, { recursive: true })
       }
       await connection.query(`UPDATE meeting_days SET meeting_date = ? WHERE id = ?`, [
         meetingDate,
@@ -225,11 +242,16 @@ export const createMeetingHandlers = ({
         productId: rows[0].product_id,
         meetingDate: rows[0].meeting_date,
       }
-      const { absolutePath } = resolveMeetingDayFolder({
-        meetingRootPath,
-        productId: meetingInfo.productId,
-        meetingDate: meetingInfo.meetingDate,
-      })
+      const pathInfo = await getMeetingPathInfo(
+        connection,
+        meetingInfo.productId,
+        meetingInfo.meetingDate
+      )
+      if (!pathInfo) {
+        sendJson(res, 404, { message: 'Product not found' })
+        return
+      }
+      const { absolutePath } = pathInfo
       await fs.rm(absolutePath, { recursive: true, force: true })
       await connection.query(`DELETE FROM meeting_days WHERE id = ?`, [meetingDayId])
       sendJson(res, 200, { ok: true })
@@ -262,11 +284,16 @@ export const createMeetingHandlers = ({
         productId: rows[0].product_id,
         meetingDate: rows[0].meeting_date,
       }
-      const { absolutePath } = resolveMeetingDayFolder({
-        meetingRootPath,
-        productId: meetingInfo.productId,
-        meetingDate: meetingInfo.meetingDate,
-      })
+      const pathInfo = await getMeetingPathInfo(
+        connection,
+        meetingInfo.productId,
+        meetingInfo.meetingDate
+      )
+      if (!pathInfo) {
+        sendJson(res, 404, { message: 'Product not found' })
+        return
+      }
+      const { absolutePath } = pathInfo
       let entries = []
       try {
         entries = await fs.readdir(absolutePath, { withFileTypes: true })
@@ -325,11 +352,16 @@ export const createMeetingHandlers = ({
         meetingDate: rows[0].meeting_date,
       }
       await ensureMeetingStorage()
-      const { absolutePath, relativePath } = resolveMeetingDayFolder({
-        meetingRootPath,
-        productId: meetingInfo.productId,
-        meetingDate: meetingInfo.meetingDate,
-      })
+      const pathInfo = await getMeetingPathInfo(
+        connection,
+        meetingInfo.productId,
+        meetingInfo.meetingDate
+      )
+      if (!pathInfo) {
+        sendJson(res, 404, { message: 'Product not found' })
+        return
+      }
+      const { absolutePath, relativePath } = pathInfo
       await fs.mkdir(absolutePath, { recursive: true })
       for (const file of files) {
         const parsed = parseBase64Payload(file?.content)
@@ -388,11 +420,16 @@ export const createMeetingHandlers = ({
         productId: rows[0].product_id,
         meetingDate: rows[0].meeting_date,
       }
-      const { absolutePath } = resolveMeetingDayFolder({
-        meetingRootPath,
-        productId: meetingInfo.productId,
-        meetingDate: meetingInfo.meetingDate,
-      })
+      const pathInfo = await getMeetingPathInfo(
+        connection,
+        meetingInfo.productId,
+        meetingInfo.meetingDate
+      )
+      if (!pathInfo) {
+        sendJson(res, 404, { message: 'Product not found' })
+        return
+      }
+      const { absolutePath } = pathInfo
       const filePath = path.join(absolutePath, filename)
       res.writeHead(200, {
         'Content-Type': 'application/octet-stream',
@@ -434,11 +471,16 @@ export const createMeetingHandlers = ({
         productId: rows[0].product_id,
         meetingDate: rows[0].meeting_date,
       }
-      const { absolutePath } = resolveMeetingDayFolder({
-        meetingRootPath,
-        productId: meetingInfo.productId,
-        meetingDate: meetingInfo.meetingDate,
-      })
+      const pathInfo = await getMeetingPathInfo(
+        connection,
+        meetingInfo.productId,
+        meetingInfo.meetingDate
+      )
+      if (!pathInfo) {
+        sendJson(res, 404, { message: 'Product not found' })
+        return
+      }
+      const { absolutePath } = pathInfo
       await fs.rm(path.join(absolutePath, filename), { force: true })
       sendJson(res, 200, { ok: true })
     } catch (error) {
