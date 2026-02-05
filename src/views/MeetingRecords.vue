@@ -304,6 +304,7 @@ onMounted(() => {
   min-height: 100vh;
   background: #f8fafc;
   color: #0f172a;
+  display:flex;
 }
 
 .content {
