@@ -260,8 +260,25 @@ onMounted(() => {
         </aside>
 
         <main class="files-panel">
-          <div class="panel-title">
-            {{ selectedMeetingDay ? `${selectedMeetingDay.meeting_date}的會議記錄` : '會議文件' }}
+          <div class="panel-title panel-title--split">
+            <span>
+              {{
+                selectedProductId
+                  ? selectedMeetingDay
+                    ? `${selectedMeetingDay.meeting_date}的會議記錄`
+                    : '會議文件'
+                  : '請先選擇會議'
+              }}
+            </span>
+            <button
+              v-if="selectedProductId"
+              type="button"
+              class="tree-day-delete"
+              :disabled="!selectedDayId"
+              @click="handleDeleteDay(selectedMeetingDay)"
+            >
+              刪除日期
+            </button>
           </div>
           <div class="upload-bar">
             <div class="header-actions">
@@ -293,14 +310,6 @@ onMounted(() => {
                   更新日期
                 </button>
               </div>
-              <button
-                type="button"
-                class="tree-day-delete"
-                :disabled="!selectedDayId"
-                @click="handleDeleteDay(selectedMeetingDay)"
-              >
-                刪除日期
-              </button>
             </div>
             <input
               type="file"
@@ -309,10 +318,6 @@ onMounted(() => {
               :disabled="!selectedDayId || uploading"
               @change="handleUpload"
             />
-            <div class="upload-hint">
-              <div v-if="!selectedMeetingDay">請先選擇會議日期</div>
-              <div v-if="uploadError" class="state-card state-card--error">{{ uploadError }}</div>
-            </div>
           </div>
 
           <div v-if="filesLoading" class="state-card">文件載入中...</div>
@@ -456,6 +461,13 @@ onMounted(() => {
   margin-bottom: 1rem;
 }
 
+.panel-title--split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .state-card {
   padding: 0.9rem 1rem;
   border-radius: 12px;
@@ -575,12 +587,6 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   margin-right: 0.75rem;
-}
-
-.upload-hint {
-  display: grid;
-  gap: 0.35rem;
-  color: #475569;
 }
 
 .files-table {
