@@ -260,7 +260,9 @@ onMounted(() => {
         </aside>
 
         <main class="files-panel">
-          <div class="panel-title">會議文件</div>
+          <div class="panel-title">
+            {{ selectedMeetingDay ? `${selectedMeetingDay.meeting_date}的會議記錄` : '會議文件' }}
+          </div>
           <div class="upload-bar">
             <div class="header-actions">
               <div class="date-field">
@@ -308,10 +310,7 @@ onMounted(() => {
               @change="handleUpload"
             />
             <div class="upload-hint">
-              <div v-if="selectedMeetingDay">
-                目前日期：{{ selectedMeetingDay.meeting_date }}
-              </div>
-              <div v-else>請先選擇會議日期</div>
+              <div v-if="!selectedMeetingDay">請先選擇會議日期</div>
               <div v-if="uploadError" class="state-card state-card--error">{{ uploadError }}</div>
             </div>
           </div>
