@@ -901,7 +901,7 @@ onMounted(() => {
 .table {
   background: #ffffff;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: auto;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
   color: #1f2937;
   border: 1px solid #e2e8f0;
