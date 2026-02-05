@@ -230,8 +230,8 @@ export const createMeetingHandlers = ({
         productId: meetingInfo.productId,
         meetingDate: meetingInfo.meetingDate,
       })
-      await connection.query(`DELETE FROM meeting_days WHERE id = ?`, [meetingDayId])
       await fs.rm(absolutePath, { recursive: true, force: true })
+      await connection.query(`DELETE FROM meeting_days WHERE id = ?`, [meetingDayId])
       sendJson(res, 200, { ok: true })
     } catch (error) {
       await logger.error(`Meeting day delete failed: ${error?.message || error}`)
