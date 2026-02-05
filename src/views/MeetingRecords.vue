@@ -222,31 +222,15 @@ onMounted(() => {
             <div v-for="project in tree" :key="project.id" class="tree-project">
               <div class="tree-project__name">📁 {{ project.name }}</div>
               <div class="tree-project__products">
-                <div
-                  v-for="product in project.products"
-                  :key="product.id"
-                  class="tree-product"
-                >
-                  <button
-                    class="tree-product__name"
-                    :class="{ active: product.id === selectedProductId }"
-                    type="button"
-                    @click="handleSelectProduct(product)"
-                  >
+                <div v-for="product in project.products" :key="product.id" class="tree-product">
+                  <button class="tree-product__name" :class="{ active: product.id === selectedProductId }" type="button"
+                    @click="handleSelectProduct(product)">
                     📦 {{ product.name }}
                   </button>
                   <div class="tree-days">
-                    <div
-                      v-for="day in product.meeting_days"
-                      :key="day.id"
-                      class="tree-day-row"
-                      :class="{ active: day.id === selectedDayId }"
-                    >
-                      <button
-                        type="button"
-                        class="tree-day"
-                        @click="handleSelectDay(product, day)"
-                      >
+                    <div v-for="day in product.meeting_days" :key="day.id" class="tree-day-row"
+                      :class="{ active: day.id === selectedDayId }">
+                      <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
                         🗓️ {{ day.meeting_date }}
                       </button>
                     </div>
@@ -273,50 +257,33 @@ onMounted(() => {
                     : '請先選擇會議'
                 }}
               </span>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.txt,.docx"
-                :disabled="!selectedDayId || uploading"
-                @change="handleUpload"
-              />
-              <button
-                v-if="selectedProductId"
-                type="button"
-                class="tree-day-delete"
-                :disabled="!selectedDayId"
-                @click="handleDeleteDay(selectedMeetingDay)"
-              >
+              <button v-if="selectedProductId" type="button" class="tree-day-delete" :disabled="!selectedDayId"
+                @click="handleDeleteDay(selectedMeetingDay)">
                 刪除日期
               </button>
             </div>
-            <div class="header-actions">
-              <div class="date-field">
-                <label>
-                  {{ actionMode === 'create' ? '新增日期' : '重新命名' }}
-                  <input v-model="meetingDate" type="date" />
-                </label>
-                <div class="date-field__actions">
-                  <button
-                    type="button"
-                    class="primary-button"
-                    :disabled="
-                      actionMode === 'create'
-                        ? !selectedProductId || !meetingDate
-                        : !selectedDayId || !meetingDate
-                    "
-                    @click="handleSubmitDay"
-                  >
-                    {{ actionMode === 'create' ? '新增資料夾' : '更新日期' }}
-                  </button>
-                  <button type="button" class="toggle-button" @click="toggleActionMode">
-                    ⇄
-                  </button>
-                </div>
+          </div>
+          <div class="header-actions">            
+            <div class="date-field">
+              <label>
+                {{ actionMode === 'create' ? '新增日期' : '重新命名' }}
+              </label>
+              <input v-model="meetingDate" type="date" />
+              <div class="date-field__actions">
+                <button type="button" class="primary-button" :disabled="actionMode === 'create'
+                  ? !selectedProductId || !meetingDate
+                  : !selectedDayId || !meetingDate
+                  " @click="handleSubmitDay">
+                  {{ actionMode === 'create' ? '➕' : '🔄' }}
+                </button>
+                <button type="button" class="toggle-button" @click="toggleActionMode">
+                  ⇄
+                </button>
               </div>
             </div>
+            <input class="panel-title__left_input" type="file" multiple accept=".pdf,.txt,.docx"
+              :disabled="!selectedDayId || uploading" @change="handleUpload" />
           </div>
-
           <div v-if="filesLoading" class="state-card">文件載入中...</div>
           <div v-else-if="filesError" class="state-card state-card--error">{{ filesError }}</div>
           <div v-else-if="files.length === 0" class="state-card">目前沒有文件。</div>
@@ -383,13 +350,14 @@ onMounted(() => {
 
 .header-actions {
   display: flex;
-  gap: 1rem;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 1rem;
   flex-wrap: wrap;
 }
 
 .date-field {
   display: flex;
-  align-items: center;
   gap: 0.75rem;
   background: #ffffff;
   padding: 0.75rem 1rem;
@@ -399,7 +367,9 @@ onMounted(() => {
 
 .date-field label {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.35rem;
   font-size: 0.85rem;
   color: #475569;
@@ -421,7 +391,7 @@ onMounted(() => {
 .primary-button,
 .ghost-button {
   border-radius: 10px;
-  padding: 0.45rem 0.9rem;
+  padding: 0.45rem 0.45rem;
   border: none;
   cursor: pointer;
   font-weight: 600;
@@ -483,7 +453,8 @@ onMounted(() => {
 
 .panel-title__left {
   display: flex;
-  align-items: center;
+  width: 100%;
+  justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
 }
@@ -571,7 +542,7 @@ onMounted(() => {
   color: #94a3b8;
 }
 
-.panel-title__left input[type='file'] {
+.panel-title__left_input[type='file'] {
   border: 1px dashed #cbd5f5;
   padding: 0.75rem;
   border-radius: 12px;
@@ -579,7 +550,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.panel-title__left input[type='file']::file-selector-button {
+.panel-title__left_input[type='file']::file-selector-button {
   border: none;
   background: #2563eb;
   color: #ffffff;
@@ -590,7 +561,7 @@ onMounted(() => {
   margin-right: 0.75rem;
 }
 
-.panel-title__left input[type='file']::-webkit-file-upload-button {
+.panel-title__left_input[type='file']::-webkit-file-upload-button {
   border: none;
   background: #2563eb;
   color: #ffffff;
