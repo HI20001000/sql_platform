@@ -27,6 +27,13 @@ const ensureDatabase = async () => {
 }
 
 const ensureCreateProjectTables = async (db) => {
+  await db.query(`CREATE TABLE IF NOT EXISTS statuses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(64) NOT NULL,
+    color VARCHAR(32) NOT NULL DEFAULT '#e2e8f0',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_status_name (name)
+  )`)
   await db.query(`CREATE TABLE IF NOT EXISTS projects (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -48,6 +55,7 @@ const ensureCreateProjectTables = async (db) => {
     product_id INT NOT NULL,
     title VARCHAR(255) NOT NULL,
     current_status VARCHAR(64) NOT NULL,
+    status_id INT NULL,
     created_by VARCHAR(255) NOT NULL,
     assignee_user_id VARCHAR(64),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -60,12 +68,78 @@ const ensureCreateProjectTables = async (db) => {
     id INT AUTO_INCREMENT PRIMARY KEY,
     task_id INT NOT NULL,
     status VARCHAR(64) NOT NULL,
+    status_id INT NULL,
     content TEXT NOT NULL,
     created_by VARCHAR(255) NOT NULL,
     assignee_user_id VARCHAR(64),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_task_steps_task_id (task_id)
   )`)
+
+  await ensureStatusDefaults(db)
+  await ensureStatusColumns(db)
+  await backfillStatusIds(db)
+}
+
+const ensureStatusDefaults = async (db) => {
+  const [rows] = await db.query('SELECT COUNT(*) AS count FROM statuses')
+  if ((rows[0]?.count ?? 0) > 0) return
+  await db.query(
+    `INSERT INTO statuses (name, color) VALUES
+      ('待處理', '#e2e8f0'),
+      ('進行中', '#bfdbfe'),
+      ('完成', '#bbf7d0')`
+  )
+}
+
+const ensureStatusColumns = async (db) => {
+  await ensureColumn(db, 'tasks', 'status_id', 'INT NULL')
+  await ensureColumn(db, 'task_steps', 'status_id', 'INT NULL')
+  await ensureColumnType(db, 'tasks', 'assignee_user_id', 'INT NULL')
+  await ensureColumnType(db, 'task_steps', 'assignee_user_id', 'INT NULL')
+}
+
+const ensureColumn = async (db, table, column, definition) => {
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS count
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [MYSQL_DATABASE, table, column]
+  )
+  if ((rows[0]?.count ?? 0) > 0) return
+  try {
+    await db.query(`ALTER TABLE \`${table}\` ADD COLUMN ${column} ${definition}`)
+  } catch (error) {
+    if (error?.code === 'ER_DUP_FIELDNAME') return
+    throw error
+  }
+}
+
+const ensureColumnType = async (db, table, column, definition) => {
+  const [rows] = await db.query(
+    `SELECT data_type AS dataType
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [MYSQL_DATABASE, table, column]
+  )
+  if (!rows.length) return
+  if (rows[0]?.dataType === 'int') return
+  await db.query(`ALTER TABLE \`${table}\` MODIFY COLUMN ${column} ${definition}`)
+}
+
+const backfillStatusIds = async (db) => {
+  await db.query(
+    `UPDATE tasks t
+     JOIN statuses s ON s.name = t.current_status
+     SET t.status_id = s.id
+     WHERE t.status_id IS NULL`
+  )
+  await db.query(
+    `UPDATE task_steps ts
+     JOIN statuses s ON s.name = ts.status
+     SET ts.status_id = s.id
+     WHERE ts.status_id IS NULL`
+  )
 }
 
 const initDatabase = async () => {
