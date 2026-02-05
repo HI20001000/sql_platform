@@ -8,19 +8,19 @@ import {
   createProjectNode,
   createTaskNode,
   createTaskStep,
+  createStatus,
   deleteProductTree,
   deleteProjectTree,
   deleteTaskTree,
   fetchTaskStepsByTaskId,
+  fetchStatuses,
   getConnection as getCreateProjectConnection,
+  getDefaultStatusId,
+  updateTaskStepStatus,
   updateProductName,
   updateProjectName,
   updateTaskFields,
-<<<<<<< HEAD
-} from '../scripts/CreateProject/index.js'
-=======
 } from '../src/scripts/CreateProject/index.js'
->>>>>>> origin/codex/fix-infinite-recursion-in-walk-function-ihw2uo
 let createLogger = null
 let createSqlAuditWrapper = null
 let mysql = null
@@ -397,16 +397,44 @@ const addTaskStep = async (req, res) => {
   }
   try {
     const connection = await getCreateProjectConnection()
+    const statusId = body?.status_id ?? (await getDefaultStatusId(connection))
     const step = await createTaskStep(connection, {
       taskId,
       content,
       createdBy: body?.created_by?.trim() || 'system',
-      assigneeUserId: body?.assignee_user_id?.trim() || null,
+      assigneeUserId: normalizeAssigneeId(body?.assignee_user_id),
+      statusId,
     })
     sendJson(res, 200, { step })
   } catch (error) {
     await logger.error(`Task step create failed: ${error?.message || error}`)
     sendJson(res, 500, { message: 'Failed to create task step' })
+  }
+}
+
+const updateTaskStepStatusHandler = async (req, res) => {
+  const body = await parseBody(req)
+  const stepId = body?.stepId
+  if (!stepId) {
+    sendJson(res, 400, { message: 'stepId is required' })
+    return
+  }
+  try {
+    const connection = await getCreateProjectConnection()
+    const statusId = await resolveStatusId(body?.status_id ?? body?.status)
+    if (statusId == null) {
+      sendJson(res, 400, { message: 'status_id is required' })
+      return
+    }
+    const [rows] = await connection.query(`SELECT name FROM statuses WHERE id = ? LIMIT 1`, [
+      statusId,
+    ])
+    const statusName = rows[0]?.name || ''
+    const step = await updateTaskStepStatus(connection, { stepId, statusId, statusName })
+    sendJson(res, 200, { step })
+  } catch (error) {
+    await logger.error(`Task step status update failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to update task step status' })
   }
 }
 
@@ -435,14 +463,14 @@ const updateRow = async (req, res) => {
       }
       await updateProductName(connection, { productId: id, name })
     } else if (rowType === 'task') {
-      const status = body?.status
-      const assigneeUserId = body?.assignee_user_id
+      const statusId = await resolveStatusId(body?.status_id ?? body?.status)
+      const assigneeUserId = normalizeAssigneeId(body?.assignee_user_id)
       await updateTaskFields(connection, {
         taskId: id,
         title: body?.name?.trim(),
-        status: status !== undefined ? status?.trim() : undefined,
+        statusId: statusId !== undefined ? statusId : undefined,
         assigneeUserId:
-          assigneeUserId !== undefined ? assigneeUserId?.trim() || null : undefined,
+          assigneeUserId !== undefined ? assigneeUserId : undefined,
       })
     }
     sendJson(res, 200, { ok: true })
@@ -542,12 +570,14 @@ const createTask = async (req, res) => {
     return
   }
   try {
+    const connection = await getCreateProjectConnection()
+    const statusId = body?.status_id ?? (await getDefaultStatusId(connection))
     const payload = await createTaskNode({
       productId,
       title,
-      currentStatus: body?.current_status?.trim() || 'todo',
+      statusId,
       createdBy: body?.created_by?.trim() || 'system',
-      assigneeUserId: body?.assignee_user_id?.trim() || null,
+      assigneeUserId: normalizeAssigneeId(body?.assignee_user_id),
       q: body?.q,
       status: body?.status,
       assignee: body?.assignee,
@@ -558,6 +588,73 @@ const createTask = async (req, res) => {
     await logger.error(`Create task failed: ${error?.message || error}`)
     sendJson(res, 500, { message: 'Failed to create task' })
   }
+}
+
+const listStatuses = async (_req, res) => {
+  try {
+    const connection = await getCreateProjectConnection()
+    const statuses = await fetchStatuses(connection)
+    sendJson(res, 200, { statuses })
+  } catch (error) {
+    await logger.error(`Status list load failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to load statuses' })
+  }
+}
+
+const addStatus = async (req, res) => {
+  const body = await parseBody(req)
+  const name = body?.name?.trim()
+  const color = body?.color?.trim()
+  if (!name || !color) {
+    sendJson(res, 400, { message: 'name and color are required' })
+    return
+  }
+  try {
+    const connection = await getCreateProjectConnection()
+    const status = await createStatus(connection, { name, color })
+    sendJson(res, 200, { status })
+  } catch (error) {
+    await logger.error(`Status create failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to create status' })
+  }
+}
+
+const listUsers = async (_req, res) => {
+  try {
+    const connection = await getConnection()
+    const [rows] = await connection.query(
+      `SELECT id, mail, username, icon, icon_bg
+       FROM users
+       ORDER BY created_at ASC`
+    )
+    sendJson(res, 200, { users: rows })
+  } catch (error) {
+    await logger.error(`User list load failed: ${error?.message || error}`)
+    sendJson(res, 500, { message: 'Failed to load users' })
+  }
+}
+
+const resolveStatusId = async (value) => {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  if (/^\d+$/.test(normalized)) return Number(normalized)
+  const connection = await getCreateProjectConnection()
+  const [rows] = await connection.query(`SELECT id FROM statuses WHERE name = ? LIMIT 1`, [
+    normalized,
+  ])
+  return rows[0]?.id ?? null
+}
+
+const normalizeAssigneeId = (value) => {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  if (Number.isNaN(parsed)) return null
+  return parsed
 }
 
 const start = async () => {
@@ -598,6 +695,18 @@ const start = async () => {
       await addTaskStep(req, res)
       return
     }
+    if (url.pathname === '/api/create-project/task-step-status' && req.method === 'POST') {
+      await updateTaskStepStatusHandler(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/statuses' && req.method === 'GET') {
+      await listStatuses(req, res)
+      return
+    }
+    if (url.pathname === '/api/create-project/status' && req.method === 'POST') {
+      await addStatus(req, res)
+      return
+    }
     if (
       url.pathname === '/api/create-project/update-row' &&
       ['POST', 'PUT', 'PATCH'].includes(req.method)
@@ -622,6 +731,10 @@ const start = async () => {
     }
     if (url.pathname === '/api/create-project/task' && req.method === 'POST') {
       await createTask(req, res)
+      return
+    }
+    if (url.pathname === '/api/users' && req.method === 'GET') {
+      await listUsers(req, res)
       return
     }
     sendJson(res, 404, { message: 'Not found' })

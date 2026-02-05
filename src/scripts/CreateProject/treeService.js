@@ -92,7 +92,9 @@ export const buildProjectTreeRows = async ({ q, status, assignee, includeEmpty =
       parentId: record.product_id,
       level: 2,
       name: record.task_title,
-      status: record.current_status || '-',
+      status: record.status_name || record.current_status || '-',
+      status_id: record.status_id ?? null,
+      status_color: record.status_color || '#e2e8f0',
       assignee_user_id: record.assignee_user_id ?? '-',
       created_at: record.task_created_at,
       updated_at: record.task_updated_at,
@@ -196,7 +198,7 @@ export const createProductNode = async ({
 export const createTaskNode = async ({
   productId,
   title,
-  currentStatus,
+  statusId,
   createdBy,
   assigneeUserId,
   q,
@@ -208,7 +210,7 @@ export const createTaskNode = async ({
   await createTask(connection, {
     productId,
     title,
-    currentStatus,
+    statusId,
     createdBy,
     assigneeUserId,
   })
