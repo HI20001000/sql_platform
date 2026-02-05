@@ -1,29 +1,40 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import AddNodeModal from '../components/CreateProject/AddNodeModal.vue'
+import AssigneeDropdown from '../components/CreateProject/AssigneeDropdown.vue'
 import EditRowModal from '../components/CreateProject/EditRowModal.vue'
 import MoreRowModal from '../components/CreateProject/MoreRowModal.vue'
+import StatusDropdown from '../components/CreateProject/StatusDropdown.vue'
 import TaskStepsModal from '../components/CreateProject/TaskStepsModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
+  createStatus,
   createProduct,
   createProject,
   createTask,
   createTaskStep,
   deleteRow,
+  fetchStatuses,
+  fetchUsers,
   fetchProjectTree,
   fetchTaskSteps,
+  updateTaskStepStatus,
   updateRow,
 } from '../scripts/CreateProject/api.js'
 
 const searchQuery = ref('')
-const statusInput = ref('')
-const assigneeInput = ref('')
+const statusFilterId = ref(null)
+const assigneeFilterId = ref(null)
 
 const rows = ref([])
 const taskCount = ref(0)
 const loading = ref(false)
 const error = ref('')
+const statusOptions = ref([])
+const userOptions = ref([])
+const metaError = ref('')
+const activeMenuId = ref(null)
+const stepAssigneeMenuId = 'step-assignee'
 
 const expandedMap = ref(new Set())
 
@@ -49,16 +60,21 @@ const addModalParent = ref(null)
 const addModalLoading = ref(false)
 const addModalError = ref('')
 
-const parseTokens = (value) => {
-  if (!value) return []
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-const statusFilters = computed(() => parseTokens(statusInput.value))
-const assigneeFilters = computed(() => parseTokens(assigneeInput.value))
+const statusFilters = computed(() => {
+  if (!statusFilterId.value) return []
+  const status = statusOptions.value.find(
+    (entry) => String(entry.id) === String(statusFilterId.value)
+  )
+  return status?.name ? [status.name] : []
+})
+const assigneeFilters = computed(() => {
+  if (!assigneeFilterId.value) return []
+  const user = userOptions.value.find(
+    (entry) => String(entry.id) === String(assigneeFilterId.value)
+  )
+  return user?.username ? [user.username] : []
+})
+const defaultStatusId = computed(() => statusOptions.value[0]?.id ?? null)
 
 const hasActiveFilters = computed(
   () =>
@@ -199,6 +215,14 @@ const getCurrentUser = () => {
   }
 }
 
+const resolveCurrentUserId = () => {
+  const user = getCurrentUser()
+  const userMail = user?.mail
+  if (!userMail) return null
+  const matched = userOptions.value.find((entry) => entry.mail === userMail)
+  return matched?.id ?? null
+}
+
 const formatTypeLabel = (type) => {
   switch (type) {
     case 'project':
@@ -270,6 +294,17 @@ const loadTree = async ({ preserveExpanded = false } = {}) => {
   }
 }
 
+const loadMeta = async () => {
+  metaError.value = ''
+  try {
+    const [statusResponse, userResponse] = await Promise.all([fetchStatuses(), fetchUsers()])
+    statusOptions.value = statusResponse.statuses || []
+    userOptions.value = userResponse.users || []
+  } catch (err) {
+    metaError.value = err?.message || '載入狀態或使用者資料失敗'
+  }
+}
+
 const openAddModal = ({ type, parent }) => {
   addModalType.value = type
   addModalParent.value = parent || null
@@ -313,9 +348,9 @@ const handleAddSubmit = async (name) => {
       response = await createTask({
         productId,
         title: name,
-        current_status: 'todo',
+        status_id: defaultStatusId.value,
         created_by: createdBy,
-        assignee_user_id: user?.mail || null,
+        assignee_user_id: resolveCurrentUserId(),
         ...buildFilterPayload(),
       })
       const projectId = addModalParent.value?.parentId
@@ -351,6 +386,7 @@ const openTaskSteps = async (row) => {
   stepsError.value = ''
   stepsData.value = []
   stepSubmitError.value = ''
+  activeMenuId.value = null
   try {
     const response = await fetchTaskSteps(row.id)
     stepsData.value = response.steps || []
@@ -369,6 +405,7 @@ const closeTaskSteps = () => {
   stepsLoading.value = false
   stepSubmitError.value = ''
   stepSubmitLoading.value = false
+  activeMenuId.value = null
 }
 
 const openEditModal = (row) => {
@@ -457,18 +494,20 @@ const handleMoreUpdate = async ({ status, assignee_user_id }) => {
 }
 
 const handleAddStep = async ({ content, assignee_user_id }) => {
-  if (!currentTask.value?.id) return
+  const taskId = currentTask.value?.id
+  if (!taskId) return
   stepSubmitLoading.value = true
   stepSubmitError.value = ''
   const user = getCurrentUser()
   try {
     const response = await createTaskStep({
-      taskId: currentTask.value.id,
+      taskId,
       content,
       assignee_user_id,
       created_by: user?.username || user?.mail || 'system',
+      status_id: defaultStatusId.value,
     })
-    if (response?.step) {
+    if (response?.step && currentTask.value?.id === taskId) {
       stepsData.value = [...stepsData.value, response.step]
     }
   } catch (err) {
@@ -478,8 +517,87 @@ const handleAddStep = async ({ content, assignee_user_id }) => {
   }
 }
 
+const handleStepStatusUpdate = async ({ step, status }) => {
+  if (!step?.id || !status?.id) return
+  try {
+    const response = await updateTaskStepStatus({ stepId: step.id, status_id: status.id })
+    if (response?.step) {
+      stepsData.value = stepsData.value.map((item) => (item.id === step.id ? response.step : item))
+    }
+  } catch (err) {
+    stepSubmitError.value = err?.message || '更新步驟狀態失敗'
+  }
+}
+
+const handleStatusSelect = async (row, status) => {
+  if (!row || row.rowType !== 'task') return
+  try {
+    await updateRow({
+      rowType: row.rowType,
+      id: row.id,
+      status_id: status.id,
+    })
+    rows.value = rows.value.map((item) =>
+      item.id === row.id && item.rowType === 'task'
+        ? {
+            ...item,
+            status: status.name,
+            status_id: status.id,
+            status_color: status.color,
+          }
+        : item
+    )
+  } catch (err) {
+    error.value = err?.message || '更新狀態失敗'
+  }
+}
+
+const setActiveMenu = (menuId) => {
+  activeMenuId.value = menuId
+}
+
+const handleStatusCreate = async ({ name, color }) => {
+  try {
+    const response = await createStatus({ name, color })
+    if (response?.status) {
+      statusOptions.value = [...statusOptions.value, response.status]
+    }
+  } catch (err) {
+    error.value = err?.message || '新增狀態失敗'
+  }
+}
+
+const handleAssigneeSelect = async (row, user) => {
+  if (!row || row.rowType !== 'task') return
+  try {
+    await updateRow({
+      rowType: row.rowType,
+      id: row.id,
+      assignee_user_id: user?.id ?? null,
+    })
+    rows.value = rows.value.map((item) =>
+      item.id === row.id && item.rowType === 'task'
+        ? {
+            ...item,
+            assignee_user_id: user?.id ?? null,
+          }
+        : item
+    )
+  } catch (err) {
+    error.value = err?.message || '更新負責人失敗'
+  }
+}
+
+const resetFilters = () => {
+  searchQuery.value = ''
+  statusFilterId.value = null
+  assigneeFilterId.value = null
+  activeMenuId.value = null
+  loadTree()
+}
+
 let debounceTimer = null
-watch([searchQuery, statusInput, assigneeInput], () => {
+watch([searchQuery, statusFilterId, assigneeFilterId], () => {
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
     loadTree()
@@ -488,6 +606,7 @@ watch([searchQuery, statusInput, assigneeInput], () => {
 
 onMounted(() => {
   loadTree()
+  loadMeta()
 })
 </script>
 
@@ -514,28 +633,42 @@ onMounted(() => {
         <div class="filter-group">
           <label class="filter-field">
             <span>狀態</span>
-            <input
-              v-model="statusInput"
-              type="text"
-              placeholder="狀態 (逗號分隔)"
+            <StatusDropdown
+              :status-id="statusFilterId"
+              :status-name="statusFilters[0] || '選擇狀態'"
+              :status-color="
+                statusOptions.find((entry) => String(entry.id) === String(statusFilterId))?.color
+              "
+              :statuses="statusOptions"
+              :allow-create="false"
+              :menu-id="'filter-status'"
+              :active-menu-id="activeMenuId"
+              @select="(status) => (statusFilterId = status.id)"
+              @toggle="setActiveMenu"
             />
           </label>
           <label class="filter-field">
             <span>負責人</span>
-            <input
-              v-model="assigneeInput"
-              type="text"
-              placeholder="負責人 ID (逗號分隔)"
+            <AssigneeDropdown
+              :assignee-id="assigneeFilterId"
+              :users="userOptions"
+              :menu-id="'filter-assignee'"
+              :active-menu-id="activeMenuId"
+              @select="(user) => (assigneeFilterId = user.id)"
+              @toggle="setActiveMenu"
             />
           </label>
         </div>
-        <div class="task-count">任務總數：{{ taskCount }}</div>
+        <div class="toolbar-actions">
+          <div class="task-count">任務總數：{{ taskCount }}</div>
+        </div>
+        <button class="reset-button" type="button" @click="resetFilters" aria-label="清空搜尋">
+          ⟲
+        </button>
       </div>
 
       <div v-if="loading" class="state-card">資料載入中...</div>
-      <div v-else-if="error" class="state-card state-card--error">{{ error }}</div>
-      <div v-else-if="visibleRows.length === 0" class="state-card">目前沒有資料。</div>
-      <div v-else class="table">
+      <div class="table">
         <div class="table-row table-row--header">
           <div>層級名稱</div>
           <div>狀態</div>
@@ -548,12 +681,14 @@ onMounted(() => {
         </div>
         <div v-else-if="error" class="table-row table-row--empty">
           <div class="table-empty" :style="{ gridColumn: '1 / -1' }">
-            <span>{{ error }}</span>
+            <span class="table-empty--error">數據庫連接失敗</span>
             <button class="retry-button" type="button" @click="loadTree">重試</button>
           </div>
         </div>
         <div v-else-if="visibleRows.length === 0" class="table-row table-row--empty">
-          <div class="table-empty" :style="{ gridColumn: '1 / -1' }">目前沒有資料。</div>
+          <div class="table-empty" :style="{ gridColumn: '1 / -1' }">
+            <span class="table-empty--error">沒有對應的數據</span>
+          </div>
         </div>
         <template v-else>
           <div
@@ -605,12 +740,32 @@ onMounted(() => {
               </div>
             </div>
             <div class="status-cell">
-              <span v-if="row.rowType === 'task'" class="status-pill">
-                {{ row.status || '-' }}
-              </span>
+              <StatusDropdown
+                v-if="row.rowType === 'task'"
+                :status-id="row.status_id"
+                :status-name="row.status"
+                :status-color="row.status_color"
+                :statuses="statusOptions"
+                :menu-id="`status-${row.id}`"
+                :active-menu-id="activeMenuId"
+                @select="(status) => handleStatusSelect(row, status)"
+                @create="handleStatusCreate"
+                @toggle="setActiveMenu"
+              />
               <span v-else class="status-muted">-</span>
             </div>
-            <div>{{ row.rowType === 'task' ? row.assignee_user_id ?? '-' : '-' }}</div>
+            <div>
+              <AssigneeDropdown
+                v-if="row.rowType === 'task'"
+                :assignee-id="row.assignee_user_id"
+                :users="userOptions"
+                :menu-id="`assignee-${row.id}`"
+                :active-menu-id="activeMenuId"
+                @select="(user) => handleAssigneeSelect(row, user)"
+                @toggle="setActiveMenu"
+              />
+              <span v-else>-</span>
+            </div>
             <div>{{ row.updated_at }}</div>
             <div>{{ row.created_at }}</div>
           </div>
@@ -622,12 +777,19 @@ onMounted(() => {
       :visible="modalVisible"
       :task="currentTask"
       :steps="stepsData"
+      :users="userOptions"
+      :statuses="statusOptions"
+      :active-menu-id="activeMenuId"
+      :menu-id="stepAssigneeMenuId"
       :loading="stepsLoading"
       :error="stepsError"
       :submit-loading="stepSubmitLoading"
       :submit-error="stepSubmitError"
       @close="closeTaskSteps"
       @submit="handleAddStep"
+      @update-step-status="handleStepStatusUpdate"
+      @create-status="handleStatusCreate"
+      @toggle="setActiveMenu"
     />
     <EditRowModal
       :visible="editModalVisible"
@@ -709,7 +871,7 @@ onMounted(() => {
 
 .toolbar-row {
   display: grid;
-  grid-template-columns: 1.2fr 2fr auto;
+  grid-template-columns: 1.2fr 2fr auto auto;
   gap: 1.5rem;
   align-items: center;
   background: #ffffff;
@@ -738,24 +900,45 @@ onMounted(() => {
   outline: none;
 }
 
+.toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.reset-button {
+  border: none;
+  background: #e2e8f0;
+  color: #0f172a;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+}
+
+.reset-button:hover {
+  background: #cbd5f5;
+}
+
 .filter-group {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  padding: 0 1rem;
+  border-left: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
 }
 
 .filter-field {
-  display: grid;
-  gap: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   font-size: 0.85rem;
   color: #475569;
-}
-
-.filter-field input {
-  border: 1px solid #e2e8f0;
-  padding: 0.5rem 0.75rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
 }
 
 .task-count {
@@ -909,6 +1092,11 @@ onMounted(() => {
   color: #64748b;
   font-weight: 500;
   padding: 1.2rem 0;
+}
+
+.table-empty--error {
+  color: #b91c1c;
+  font-weight: 600;
 }
 
 .retry-button {
