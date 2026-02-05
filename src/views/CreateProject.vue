@@ -662,7 +662,12 @@ onMounted(() => {
             />
           </label>
         </div>
-        <div class="task-count">任務總數：{{ taskCount }}</div>
+        <div class="toolbar-actions">
+          <button class="reset-button" type="button" @click="resetFilters" aria-label="清空搜尋">
+            ⟲
+          </button>
+          <div class="task-count">任務總數：{{ taskCount }}</div>
+        </div>
       </div>
 
       <div v-if="loading" class="state-card">資料載入中...</div>
@@ -898,6 +903,13 @@ onMounted(() => {
   outline: none;
 }
 
+.toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
 .reset-button {
   border: none;
   background: #e2e8f0;
@@ -919,6 +931,9 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  padding: 0 1rem;
+  border-left: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
 }
 
 .filter-field {
