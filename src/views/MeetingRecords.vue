@@ -20,8 +20,8 @@ const filesLoading = ref(false)
 const filesError = ref('')
 const selectedProductId = ref(null)
 const selectedMeetingDay = ref(null)
-const newMeetingDate = ref('')
-const renameMeetingDate = ref('')
+const meetingDate = ref('')
+const actionMode = ref('create')
 const uploading = ref(false)
 const uploadError = ref('')
 
@@ -89,48 +89,50 @@ const handleSelectDay = (product, meetingDay) => {
   loadFiles()
 }
 
-const handleCreateDay = async () => {
-  if (!selectedProductId.value || !newMeetingDate.value) return
-  try {
-    const user = getCurrentUser()
-    await createMeetingDay({
-      productId: selectedProductId.value,
-      meetingDate: newMeetingDate.value,
-      createdBy: user?.username || user?.mail || 'system',
-    })
-    await loadTree()
-    const product = selectedProduct.value
-    const nextDay = product?.meeting_days?.find(
-      (day) => day.meeting_date === newMeetingDate.value
-    )
-    if (nextDay) {
-      selectedMeetingDay.value = nextDay
-      await loadFiles()
+const handleSubmitDay = async () => {
+  if (actionMode.value === 'create') {
+    if (!selectedProductId.value || !meetingDate.value) return
+    try {
+      const user = getCurrentUser()
+      await createMeetingDay({
+        productId: selectedProductId.value,
+        meetingDate: meetingDate.value,
+        createdBy: user?.username || user?.mail || 'system',
+      })
+      await loadTree()
+      const product = selectedProduct.value
+      const nextDay = product?.meeting_days?.find(
+        (day) => day.meeting_date === meetingDate.value
+      )
+      if (nextDay) {
+        selectedMeetingDay.value = nextDay
+        await loadFiles()
+      }
+      meetingDate.value = ''
+    } catch (error) {
+      treeError.value = error?.message || '新增會議日期失敗'
     }
-    newMeetingDate.value = ''
-  } catch (error) {
-    treeError.value = error?.message || '新增會議日期失敗'
+    return
   }
-}
 
-const handleRenameDay = async () => {
-  if (!selectedDayId.value || !renameMeetingDate.value) return
+  if (!selectedDayId.value || !meetingDate.value) return
   try {
     await renameMeetingDay({
       meetingDayId: selectedDayId.value,
-      meetingDate: renameMeetingDate.value,
+      meetingDate: meetingDate.value,
     })
     await loadTree()
     const product = selectedProduct.value
-    const nextDay = product?.meeting_days?.find(
-      (day) => day.meeting_date === renameMeetingDate.value
-    )
+    const nextDay = product?.meeting_days?.find((day) => day.meeting_date === meetingDate.value)
     selectedMeetingDay.value = nextDay || null
-    renameMeetingDate.value = ''
     await loadFiles()
   } catch (error) {
     treeError.value = error?.message || '更新會議日期失敗'
   }
+}
+
+const toggleActionMode = () => {
+  actionMode.value = actionMode.value === 'create' ? 'rename' : 'create'
 }
 
 const handleDeleteDay = async (meetingDay) => {
@@ -261,63 +263,58 @@ onMounted(() => {
 
         <main class="files-panel">
           <div class="panel-title panel-title--split">
-            <span>
-              {{
-                selectedProductId
-                  ? selectedMeetingDay
-                    ? `${selectedMeetingDay.meeting_date}的會議記錄`
-                    : '會議文件'
-                  : '請先選擇會議'
-              }}
-            </span>
-            <button
-              v-if="selectedProductId"
-              type="button"
-              class="tree-day-delete"
-              :disabled="!selectedDayId"
-              @click="handleDeleteDay(selectedMeetingDay)"
-            >
-              刪除日期
-            </button>
-          </div>
-          <div class="upload-bar">
+            <div class="panel-title__left">
+              <span>
+                {{
+                  selectedProductId
+                    ? selectedMeetingDay
+                      ? `${selectedMeetingDay.meeting_date}的會議記錄`
+                      : '會議文件'
+                    : '請先選擇會議'
+                }}
+              </span>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.txt,.docx"
+                :disabled="!selectedDayId || uploading"
+                @change="handleUpload"
+              />
+              <button
+                v-if="selectedProductId"
+                type="button"
+                class="tree-day-delete"
+                :disabled="!selectedDayId"
+                @click="handleDeleteDay(selectedMeetingDay)"
+              >
+                刪除日期
+              </button>
+            </div>
             <div class="header-actions">
               <div class="date-field">
                 <label>
-                  新增日期
-                  <input v-model="newMeetingDate" type="date" />
+                  {{ actionMode === 'create' ? '新增日期' : '重新命名' }}
+                  <input v-model="meetingDate" type="date" />
                 </label>
-                <button
-                  type="button"
-                  class="primary-button"
-                  :disabled="!selectedProductId || !newMeetingDate"
-                  @click="handleCreateDay"
-                >
-                  新增資料夾
-                </button>
-              </div>
-              <div class="date-field">
-                <label>
-                  重新命名
-                  <input v-model="renameMeetingDate" type="date" />
-                </label>
-                <button
-                  type="button"
-                  class="ghost-button"
-                  :disabled="!selectedDayId || !renameMeetingDate"
-                  @click="handleRenameDay"
-                >
-                  更新日期
-                </button>
+                <div class="date-field__actions">
+                  <button
+                    type="button"
+                    class="primary-button"
+                    :disabled="
+                      actionMode === 'create'
+                        ? !selectedProductId || !meetingDate
+                        : !selectedDayId || !meetingDate
+                    "
+                    @click="handleSubmitDay"
+                  >
+                    {{ actionMode === 'create' ? '新增資料夾' : '更新日期' }}
+                  </button>
+                  <button type="button" class="toggle-button" @click="toggleActionMode">
+                    ⇄
+                  </button>
+                </div>
               </div>
             </div>
-            <input
-              type="file"
-              multiple
-              accept=".pdf,.txt,.docx"
-              :disabled="!selectedDayId || uploading"
-              @change="handleUpload"
-            />
           </div>
 
           <div v-if="filesLoading" class="state-card">文件載入中...</div>
@@ -415,11 +412,27 @@ onMounted(() => {
   font-size: 0.9rem;
 }
 
+.date-field__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .primary-button,
 .ghost-button {
   border-radius: 10px;
   padding: 0.45rem 0.9rem;
   border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.toggle-button {
+  border-radius: 10px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #cbd5f5;
+  background: #ffffff;
+  color: #1d4ed8;
   cursor: pointer;
   font-weight: 600;
 }
@@ -466,6 +479,13 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.panel-title__left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .state-card {
@@ -551,15 +571,7 @@ onMounted(() => {
   color: #94a3b8;
 }
 
-.upload-bar {
-  display: flex;
-  gap: 1.5rem;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.upload-bar input[type='file'] {
+.panel-title__left input[type='file'] {
   border: 1px dashed #cbd5f5;
   padding: 0.75rem;
   border-radius: 12px;
@@ -567,7 +579,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.upload-bar input[type='file']::file-selector-button {
+.panel-title__left input[type='file']::file-selector-button {
   border: none;
   background: #2563eb;
   color: #ffffff;
@@ -578,7 +590,7 @@ onMounted(() => {
   margin-right: 0.75rem;
 }
 
-.upload-bar input[type='file']::-webkit-file-upload-button {
+.panel-title__left input[type='file']::-webkit-file-upload-button {
   border: none;
   background: #2563eb;
   color: #ffffff;
