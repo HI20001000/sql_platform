@@ -21,8 +21,10 @@ export const fetchTasksWithParents = async (connection, { q, status, assignee } 
   }
 
   if (q) {
-    conditions.push('(pr.name LIKE ? OR p.name LIKE ? OR t.title LIKE ?)')
-    params.push(`%${q}%`, `%${q}%`, `%${q}%`)
+    conditions.push(
+      '(pr.name LIKE ? OR p.name LIKE ? OR t.title LIKE ? OR s.name LIKE ? OR u.username LIKE ?)'
+    )
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`)
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
