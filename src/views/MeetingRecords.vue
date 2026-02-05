@@ -350,19 +350,19 @@ onMounted(() => {
 
 <style scoped>
 .meeting-records {
+  display:flex;
   min-height: 100vh;
   background: #f8fafc;
   color: #0f172a;
 }
 
 .content {
-  margin-left: 84px;
   padding: 2rem 2.5rem 3rem;
 }
 
 .page-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 2rem;
   align-items: flex-start;
   margin-bottom: 2rem;
@@ -379,7 +379,7 @@ onMounted(() => {
 }
 
 .header-actions {
-  display: grid;
+  display: flex;
   gap: 1rem;
 }
 
