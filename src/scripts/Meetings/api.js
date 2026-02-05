@@ -55,6 +55,18 @@ export const buildMeetingDownloadUrl = ({ meetingDayId, filename }) =>
     meetingDayId
   )}&filename=${encodeURIComponent(filename)}`
 
+export const deleteMeetingDay = async ({ meetingDayId }) => {
+  return requestJson(`${apiBaseUrl}/api/meetings/day`, { meetingDayId }, 'DELETE')
+}
+
+export const deleteMeetingFile = async ({ meetingDayId, filename }) => {
+  return requestJson(
+    `${apiBaseUrl}/api/meetings/file`,
+    { meetingDayId, filename },
+    'DELETE'
+  )
+}
+
 const requestJson = async (url, body, method = 'POST') => {
   const response = await fetch(url, {
     method,

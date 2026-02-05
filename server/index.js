@@ -765,6 +765,13 @@ const start = async () => {
       await meetingHandlers.renameMeetingDay(req, res)
       return
     }
+    if (
+      url.pathname === '/api/meetings/day' &&
+      ['DELETE'].includes(req.method)
+    ) {
+      await meetingHandlers.deleteMeetingDay(req, res)
+      return
+    }
     if (url.pathname === '/api/meetings/files' && req.method === 'GET') {
       await meetingHandlers.listMeetingFiles(req, res, url)
       return
@@ -775,6 +782,13 @@ const start = async () => {
     }
     if (url.pathname === '/api/meetings/download' && req.method === 'GET') {
       await meetingHandlers.downloadMeetingFile(req, res, url)
+      return
+    }
+    if (
+      url.pathname === '/api/meetings/file' &&
+      ['DELETE'].includes(req.method)
+    ) {
+      await meetingHandlers.deleteMeetingFile(req, res)
       return
     }
     if (url.pathname === '/api/users' && req.method === 'GET') {

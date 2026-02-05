@@ -4,6 +4,8 @@ import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
   buildMeetingDownloadUrl,
   createMeetingDay,
+  deleteMeetingDay,
+  deleteMeetingFile,
   fetchMeetingFiles,
   fetchMeetingTree,
   renameMeetingDay,
@@ -131,6 +133,33 @@ const handleRenameDay = async () => {
   }
 }
 
+const handleDeleteDay = async (meetingDay) => {
+  if (!meetingDay?.id) return
+  try {
+    await deleteMeetingDay({ meetingDayId: meetingDay.id })
+    await loadTree()
+    if (selectedDayId.value === meetingDay.id) {
+      selectedMeetingDay.value = null
+      files.value = []
+    }
+  } catch (error) {
+    treeError.value = error?.message || '刪除會議日期失敗'
+  }
+}
+
+const handleDeleteFile = async (file) => {
+  if (!selectedDayId.value || !file?.filename) return
+  try {
+    await deleteMeetingFile({
+      meetingDayId: selectedDayId.value,
+      filename: file.filename,
+    })
+    await loadFiles()
+  } catch (error) {
+    filesError.value = error?.message || '刪除檔案失敗'
+  }
+}
+
 const handleUpload = async (event) => {
   if (!selectedDayId.value) return
   const filesList = event.target.files
@@ -235,16 +264,27 @@ onMounted(() => {
                     📦 {{ product.name }}
                   </button>
                   <div class="tree-days">
-                    <button
+                    <div
                       v-for="day in product.meeting_days"
                       :key="day.id"
-                      type="button"
-                      class="tree-day"
+                      class="tree-day-row"
                       :class="{ active: day.id === selectedDayId }"
-                      @click="handleSelectDay(product, day)"
                     >
-                      🗓️ {{ day.meeting_date }}
-                    </button>
+                      <button
+                        type="button"
+                        class="tree-day"
+                        @click="handleSelectDay(product, day)"
+                      >
+                        🗓️ {{ day.meeting_date }}
+                      </button>
+                      <button
+                        type="button"
+                        class="tree-day-delete"
+                        @click.stop="handleDeleteDay(day)"
+                      >
+                        刪除
+                      </button>
+                    </div>
                     <div v-if="product.meeting_days.length === 0" class="tree-empty">
                       尚未新增日期
                     </div>
@@ -285,6 +325,7 @@ onMounted(() => {
               <div>大小</div>
               <div>建立時間</div>
               <div>下載</div>
+              <div>刪除</div>
             </div>
             <div v-for="file in files" :key="file.filename" class="files-row">
               <div class="file-name">{{ file.filename }}</div>
@@ -293,6 +334,11 @@ onMounted(() => {
               <div>{{ new Date(file.created_at).toLocaleString() }}</div>
               <div>
                 <a class="download-link" :href="downloadUrl(file.filename)">下載</a>
+              </div>
+              <div>
+                <button class="delete-link" type="button" @click="handleDeleteFile(file)">
+                  刪除
+                </button>
               </div>
             </div>
           </div>
@@ -451,6 +497,12 @@ onMounted(() => {
   padding-left: 0.5rem;
 }
 
+.tree-day-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .tree-day {
   text-align: left;
   border: none;
@@ -460,12 +512,23 @@ onMounted(() => {
   cursor: pointer;
   color: #475569;
   border: 1px solid #e2e8f0;
+  flex: 1;
 }
 
-.tree-day.active {
+.tree-day-row.active .tree-day {
   background: #eff6ff;
   color: #1d4ed8;
   border-color: #93c5fd;
+}
+
+.tree-day-delete {
+  border: none;
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
 }
 
 .tree-empty {
@@ -502,7 +565,7 @@ onMounted(() => {
 
 .files-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1.2fr 0.6fr;
+  grid-template-columns: 2fr 1fr 1fr 1.2fr 0.6fr 0.6fr;
   gap: 0.75rem;
   padding: 0.65rem 0.75rem;
   border-radius: 12px;
@@ -523,5 +586,13 @@ onMounted(() => {
   color: #2563eb;
   font-weight: 600;
   text-decoration: none;
+}
+
+.delete-link {
+  border: none;
+  background: transparent;
+  color: #dc2626;
+  font-weight: 600;
+  cursor: pointer;
 }
 </style>

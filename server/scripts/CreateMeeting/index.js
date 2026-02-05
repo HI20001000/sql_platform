@@ -201,6 +201,44 @@ export const createMeetingHandlers = ({
     }
   }
 
+  const deleteMeetingDay = async (req, res) => {
+    const body = await parseBody(req)
+    const meetingDayId = Number(body?.meetingDayId)
+    if (!meetingDayId) {
+      sendJson(res, 400, { message: 'meetingDayId is required' })
+      return
+    }
+    try {
+      const connection = await getConnection()
+      await ensureMeetingTables(connection)
+      const [rows] = await connection.query(
+        `SELECT product_id, DATE_FORMAT(meeting_date, '%Y-%m-%d') AS meeting_date
+         FROM meeting_days
+         WHERE id = ?`,
+        [meetingDayId]
+      )
+      if (!rows.length) {
+        sendJson(res, 404, { message: 'Meeting day not found' })
+        return
+      }
+      const meetingInfo = {
+        productId: rows[0].product_id,
+        meetingDate: rows[0].meeting_date,
+      }
+      const { absolutePath } = resolveMeetingDayFolder({
+        meetingRootPath,
+        productId: meetingInfo.productId,
+        meetingDate: meetingInfo.meetingDate,
+      })
+      await connection.query(`DELETE FROM meeting_days WHERE id = ?`, [meetingDayId])
+      await fs.rm(absolutePath, { recursive: true, force: true })
+      sendJson(res, 200, { ok: true })
+    } catch (error) {
+      await logger.error(`Meeting day delete failed: ${error?.message || error}`)
+      sendJson(res, 500, { message: 'Failed to delete meeting day' })
+    }
+  }
+
   const listMeetingFiles = async (_req, res, url) => {
     const meetingDayId = Number(url.searchParams.get('meetingDayId'))
     if (!meetingDayId) {
@@ -371,12 +409,52 @@ export const createMeetingHandlers = ({
     }
   }
 
+  const deleteMeetingFile = async (req, res) => {
+    const body = await parseBody(req)
+    const meetingDayId = Number(body?.meetingDayId)
+    const filename = sanitizeFilename(body?.filename || '')
+    if (!meetingDayId || !filename) {
+      sendJson(res, 400, { message: 'meetingDayId and filename are required' })
+      return
+    }
+    try {
+      const connection = await getConnection()
+      await ensureMeetingTables(connection)
+      const [rows] = await connection.query(
+        `SELECT product_id, DATE_FORMAT(meeting_date, '%Y-%m-%d') AS meeting_date
+         FROM meeting_days
+         WHERE id = ?`,
+        [meetingDayId]
+      )
+      if (!rows.length) {
+        sendJson(res, 404, { message: 'Meeting day not found' })
+        return
+      }
+      const meetingInfo = {
+        productId: rows[0].product_id,
+        meetingDate: rows[0].meeting_date,
+      }
+      const { absolutePath } = resolveMeetingDayFolder({
+        meetingRootPath,
+        productId: meetingInfo.productId,
+        meetingDate: meetingInfo.meetingDate,
+      })
+      await fs.rm(path.join(absolutePath, filename), { force: true })
+      sendJson(res, 200, { ok: true })
+    } catch (error) {
+      await logger.error(`Meeting file delete failed: ${error?.message || error}`)
+      sendJson(res, 500, { message: 'Failed to delete meeting file' })
+    }
+  }
+
   return {
     fetchMeetingTree,
     createMeetingDay,
     renameMeetingDay,
+    deleteMeetingDay,
     listMeetingFiles,
     uploadMeetingFiles,
     downloadMeetingFile,
+    deleteMeetingFile,
   }
 }
