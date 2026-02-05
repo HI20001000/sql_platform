@@ -225,7 +225,22 @@ onMounted(() => {
                 <div v-for="product in project.products" :key="product.id" class="tree-product">
                   <button class="tree-product__name" :class="{ active: product.id === selectedProductId }" type="button"
                     @click="handleSelectProduct(product)">
-                    📦 {{ product.name }}
+                    <span>📦 {{ product.name }}</span>
+                    <div v-if="product.id === selectedProductId" class="date-field" @click.stop>
+                      <label>新增日期</label>
+                      <input v-model="meetingDate" type="date" />
+                      <div class="date-field__actions">
+                        <button type="button" class="primary-button" :disabled="actionMode === 'create'
+                          ? !selectedProductId || !meetingDate
+                          : !selectedDayId || !meetingDate
+                          " @click="handleSubmitDay">
+                          ➕
+                        </button>
+                        <button type="button" class="toggle-button" @click="toggleActionMode">
+                          ⇄
+                        </button>
+                      </div>
+                    </div>
                   </button>
                   <div class="tree-days">
                     <div v-for="day in product.meeting_days" :key="day.id" class="tree-day-row"
@@ -233,6 +248,8 @@ onMounted(() => {
                       <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
                         🗓️ {{ day.meeting_date }}
                       </button>
+                      <input v-if="day.id === selectedDayId" class="panel-title__left_input" type="file" multiple
+                        accept=".pdf,.txt,.docx" :disabled="uploading" @change="handleUpload" />
                     </div>
                     <div v-if="product.meeting_days.length === 0" class="tree-empty">
                       尚未新增日期
@@ -262,27 +279,6 @@ onMounted(() => {
                 刪除日期
               </button>
             </div>
-          </div>
-          <div class="header-actions">            
-            <div class="date-field">
-              <label>
-                {{ actionMode === 'create' ? '新增日期' : '重新命名' }}
-              </label>
-              <input v-model="meetingDate" type="date" />
-              <div class="date-field__actions">
-                <button type="button" class="primary-button" :disabled="actionMode === 'create'
-                  ? !selectedProductId || !meetingDate
-                  : !selectedDayId || !meetingDate
-                  " @click="handleSubmitDay">
-                  {{ actionMode === 'create' ? '➕' : '🔄' }}
-                </button>
-                <button type="button" class="toggle-button" @click="toggleActionMode">
-                  ⇄
-                </button>
-              </div>
-            </div>
-            <input class="panel-title__left_input" type="file" multiple accept=".pdf,.txt,.docx"
-              :disabled="!selectedDayId || uploading" @change="handleUpload" />
           </div>
           <div v-if="filesLoading" class="state-card">文件載入中...</div>
           <div v-else-if="filesError" class="state-card state-card--error">{{ filesError }}</div>
@@ -346,14 +342,6 @@ onMounted(() => {
 .page-header p {
   margin: 0;
   color: #475569;
-}
-
-.header-actions {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
 }
 
 .date-field {
@@ -481,7 +469,9 @@ onMounted(() => {
 }
 
 .tree-product__name {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
   width: 100%;
   text-align: left;
   background: #f1f5f9;
@@ -507,6 +497,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .tree-day {
@@ -548,6 +539,10 @@ onMounted(() => {
   border-radius: 12px;
   background: #f8fafc;
   cursor: pointer;
+  font-size: 0;
+  color: transparent;
+  max-width: 150px;
+  overflow: hidden;
 }
 
 .panel-title__left_input[type='file']::file-selector-button {
@@ -559,6 +554,7 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   margin-right: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .panel-title__left_input[type='file']::-webkit-file-upload-button {
@@ -570,6 +566,7 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   margin-right: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .files-table {
