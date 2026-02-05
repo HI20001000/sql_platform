@@ -663,11 +663,11 @@ onMounted(() => {
           </label>
         </div>
         <div class="toolbar-actions">
-          <button class="reset-button" type="button" @click="resetFilters" aria-label="清空搜尋">
-            ⟲
-          </button>
           <div class="task-count">任務總數：{{ taskCount }}</div>
         </div>
+        <button class="reset-button" type="button" @click="resetFilters" aria-label="清空搜尋">
+          ⟲
+        </button>
       </div>
 
       <div v-if="loading" class="state-card">資料載入中...</div>
@@ -874,7 +874,7 @@ onMounted(() => {
 
 .toolbar-row {
   display: grid;
-  grid-template-columns: 1.2fr 2fr auto;
+  grid-template-columns: 1.2fr 2fr auto auto;
   gap: 1.5rem;
   align-items: center;
   background: #ffffff;
