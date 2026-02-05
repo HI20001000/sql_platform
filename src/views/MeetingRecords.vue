@@ -1,8 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
-import { apiBaseUrl } from '../scripts/apiBaseUrl.js'
 import {
+  buildMeetingDownloadUrl,
   createMeetingDay,
   fetchMeetingFiles,
   fetchMeetingTree,
@@ -160,8 +160,11 @@ const formatFileSize = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const downloadUrl = (fileId) =>
-  `${apiBaseUrl}/api/meetings/download?fileId=${encodeURIComponent(fileId)}`
+const downloadUrl = (filename) =>
+  buildMeetingDownloadUrl({
+    meetingDayId: selectedDayId.value,
+    filename,
+  })
 
 onMounted(() => {
   loadTree()
@@ -283,13 +286,13 @@ onMounted(() => {
               <div>建立時間</div>
               <div>下載</div>
             </div>
-            <div v-for="file in files" :key="file.id" class="files-row">
+            <div v-for="file in files" :key="file.filename" class="files-row">
               <div class="file-name">{{ file.filename }}</div>
               <div>{{ file.file_type }}</div>
               <div>{{ formatFileSize(file.file_size) }}</div>
               <div>{{ new Date(file.created_at).toLocaleString() }}</div>
               <div>
-                <a class="download-link" :href="downloadUrl(file.id)">下載</a>
+                <a class="download-link" :href="downloadUrl(file.filename)">下載</a>
               </div>
             </div>
           </div>

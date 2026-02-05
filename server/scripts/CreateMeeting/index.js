@@ -46,22 +46,6 @@ export const createMeetingHandlers = ({
   logger,
   meetingRootPath,
 }) => {
-  const ensureColumnLength = async (connection, table, column, minLength) => {
-    const [rows] = await connection.query(
-      `SELECT character_maximum_length AS maxLength
-       FROM information_schema.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE()
-         AND TABLE_NAME = ?
-         AND COLUMN_NAME = ?`,
-      [table, column]
-    )
-    const currentLength = rows[0]?.maxLength
-    if (!currentLength || currentLength >= minLength) return
-    await connection.query(
-      `ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` VARCHAR(${minLength}) NOT NULL`
-    )
-  }
-
   const ensureMeetingTables = async (connection) => {
     await connection.query(`CREATE TABLE IF NOT EXISTS meeting_days (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -72,18 +56,6 @@ export const createMeetingHandlers = ({
       UNIQUE KEY uniq_meeting_day (product_id, meeting_date),
       INDEX idx_meeting_day_product (product_id)
     )`)
-    await connection.query(`CREATE TABLE IF NOT EXISTS meeting_files (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      meeting_day_id INT NOT NULL,
-      filename VARCHAR(255) NOT NULL,
-      storage_path VARCHAR(500) NOT NULL,
-      file_type VARCHAR(255) NOT NULL,
-      file_size INT NOT NULL,
-      uploaded_by VARCHAR(255) NOT NULL DEFAULT 'system',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_meeting_files_day (meeting_day_id)
-    )`)
-    await ensureColumnLength(connection, 'meeting_files', 'file_type', 255)
   }
 
   const ensureMeetingStorage = async () => {
@@ -222,18 +194,6 @@ export const createMeetingHandlers = ({
         meetingDate,
         meetingDayId,
       ])
-      const [files] = await connection.query(
-        `SELECT id, storage_path FROM meeting_files WHERE meeting_day_id = ?`,
-        [meetingDayId]
-      )
-      for (const file of files) {
-        const fileName = path.posix.basename(file.storage_path)
-        const nextPath = path.posix.join(String(productId), meetingDate, fileName)
-        await connection.query(`UPDATE meeting_files SET storage_path = ? WHERE id = ?`, [
-          nextPath,
-          file.id,
-        ])
-      }
       sendJson(res, 200, { id: meetingDayId, meeting_date: meetingDate })
     } catch (error) {
       await logger.error(`Meeting day rename failed: ${error?.message || error}`)
@@ -251,13 +211,50 @@ export const createMeetingHandlers = ({
       const connection = await getConnection()
       await ensureMeetingTables(connection)
       const [rows] = await connection.query(
-        `SELECT id, filename, storage_path, file_type, file_size, created_at
-         FROM meeting_files
-         WHERE meeting_day_id = ?
-         ORDER BY created_at DESC`,
+        `SELECT product_id, DATE_FORMAT(meeting_date, '%Y-%m-%d') AS meeting_date
+         FROM meeting_days
+         WHERE id = ?`,
         [meetingDayId]
       )
-      sendJson(res, 200, { files: rows })
+      if (!rows.length) {
+        sendJson(res, 404, { message: 'Meeting day not found' })
+        return
+      }
+      const meetingInfo = {
+        productId: rows[0].product_id,
+        meetingDate: rows[0].meeting_date,
+      }
+      const { absolutePath } = resolveMeetingDayFolder({
+        meetingRootPath,
+        productId: meetingInfo.productId,
+        meetingDate: meetingInfo.meetingDate,
+      })
+      let entries = []
+      try {
+        entries = await fs.readdir(absolutePath, { withFileTypes: true })
+      } catch (error) {
+        if (error?.code === 'ENOENT') {
+          sendJson(res, 200, { files: [] })
+          return
+        }
+        throw error
+      }
+      const files = await Promise.all(
+        entries
+          .filter((entry) => entry.isFile())
+          .map(async (entry) => {
+            const filePath = path.join(absolutePath, entry.name)
+            const stats = await fs.stat(filePath)
+            return {
+              id: entry.name,
+              filename: entry.name,
+              file_type: path.extname(entry.name).slice(1) || '-',
+              file_size: stats.size,
+              created_at: stats.mtime.toISOString(),
+            }
+          })
+      )
+      sendJson(res, 200, { files })
     } catch (error) {
       await logger.error(`Meeting files load failed: ${error?.message || error}`)
       sendJson(res, 500, { message: 'Failed to load meeting files' })
@@ -268,7 +265,6 @@ export const createMeetingHandlers = ({
     const body = await parseBody(req)
     const meetingDayId = Number(body?.meetingDayId ?? url.searchParams.get('meetingDayId'))
     const files = Array.isArray(body?.files) ? body.files : []
-    const uploadedBy = body?.uploadedBy?.trim() || 'system'
     if (!meetingDayId || files.length === 0) {
       sendJson(res, 400, { message: 'meetingDayId and files are required' })
       return
@@ -322,18 +318,6 @@ export const createMeetingHandlers = ({
         }
         const storedRelativePath = path.posix.join(relativePath, storedName)
         await fs.writeFile(storedAbsolutePath, parsed.buffer)
-        await connection.query(
-          `INSERT INTO meeting_files (meeting_day_id, filename, storage_path, file_type, file_size, uploaded_by)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            meetingDayId,
-            originalName || storedName,
-            storedRelativePath,
-            file?.type || parsed.mimeType || 'application/octet-stream',
-            parsed.buffer.length,
-            uploadedBy,
-          ]
-        )
       }
       sendJson(res, 200, { ok: true })
     } catch (error) {
@@ -343,31 +327,40 @@ export const createMeetingHandlers = ({
   }
 
   const downloadMeetingFile = async (_req, res, url) => {
-    const fileId = Number(url.searchParams.get('fileId'))
-    if (!fileId) {
-      sendJson(res, 400, { message: 'fileId is required' })
+    const meetingDayId = Number(url.searchParams.get('meetingDayId'))
+    const filename = sanitizeFilename(url.searchParams.get('filename') || '')
+    if (!meetingDayId || !filename) {
+      sendJson(res, 400, { message: 'meetingDayId and filename are required' })
       return
     }
     try {
       const connection = await getConnection()
       await ensureMeetingTables(connection)
       const [rows] = await connection.query(
-        `SELECT filename, storage_path, file_type
-         FROM meeting_files
+        `SELECT product_id, DATE_FORMAT(meeting_date, '%Y-%m-%d') AS meeting_date
+         FROM meeting_days
          WHERE id = ?`,
-        [fileId]
+        [meetingDayId]
       )
       if (!rows.length) {
-        sendJson(res, 404, { message: 'File not found' })
+        sendJson(res, 404, { message: 'Meeting day not found' })
         return
       }
-      const file = rows[0]
-      const absolutePath = path.join(meetingRootPath, file.storage_path)
-      res.writeHead(200, {
-        'Content-Type': file.file_type || 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(file.filename)}"`,
+      const meetingInfo = {
+        productId: rows[0].product_id,
+        meetingDate: rows[0].meeting_date,
+      }
+      const { absolutePath } = resolveMeetingDayFolder({
+        meetingRootPath,
+        productId: meetingInfo.productId,
+        meetingDate: meetingInfo.meetingDate,
       })
-      const stream = createReadStream(absolutePath)
+      const filePath = path.join(absolutePath, filename)
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+      })
+      const stream = createReadStream(filePath)
       stream.on('error', () => {
         sendJson(res, 500, { message: 'Failed to read file' })
       })

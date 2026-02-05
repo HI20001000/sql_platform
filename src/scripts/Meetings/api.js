@@ -50,6 +50,11 @@ export const uploadMeetingFiles = async ({ meetingDayId, files, uploadedBy }) =>
   })
 }
 
+export const buildMeetingDownloadUrl = ({ meetingDayId, filename }) =>
+  `${apiBaseUrl}/api/meetings/download?meetingDayId=${encodeURIComponent(
+    meetingDayId
+  )}&filename=${encodeURIComponent(filename)}`
+
 const requestJson = async (url, body, method = 'POST') => {
   const response = await fetch(url, {
     method,
