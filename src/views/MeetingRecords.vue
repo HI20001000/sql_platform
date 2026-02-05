@@ -515,7 +515,7 @@ onMounted(() => {
   flex: 1;
 }
 
-.tree-day-row.active .tree-day {
+.tree-day-row:hover .tree-day {
   background: #eff6ff;
   color: #1d4ed8;
   border-color: #93c5fd;
@@ -550,6 +550,28 @@ onMounted(() => {
   border-radius: 12px;
   background: #f8fafc;
   cursor: pointer;
+}
+
+.upload-bar input[type='file']::file-selector-button {
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 0.75rem;
+}
+
+.upload-bar input[type='file']::-webkit-file-upload-button {
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 0.75rem;
 }
 
 .upload-hint {
