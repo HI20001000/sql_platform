@@ -39,22 +39,32 @@ export const createTaskStep = async ({
   content,
   created_by,
   assignee_user_id,
+  status_id,
 }) => {
   return requestJson(`${apiBaseUrl}/api/create-project/task-step`, {
     taskId,
     content,
     created_by,
     assignee_user_id,
+    status_id,
   })
 }
 
-export const updateRow = async ({ rowType, id, name, status, assignee_user_id }) => {
+export const updateRow = async ({ rowType, id, name, status, status_id, assignee_user_id }) => {
   return requestJson(`${apiBaseUrl}/api/create-project/update-row`, {
     rowType,
     id,
     name,
     status,
+    status_id,
     assignee_user_id,
+  })
+}
+
+export const updateTaskStepStatus = async ({ stepId, status_id }) => {
+  return requestJson(`${apiBaseUrl}/api/create-project/task-step-status`, {
+    stepId,
+    status_id,
   })
 }
 
@@ -116,7 +126,7 @@ export const createProduct = async ({
 export const createTask = async ({
   productId,
   title,
-  current_status,
+  status_id,
   created_by,
   assignee_user_id,
   q,
@@ -127,7 +137,7 @@ export const createTask = async ({
   return requestJson(`${apiBaseUrl}/api/create-project/task`, {
     productId,
     title,
-    current_status,
+    status_id,
     created_by,
     assignee_user_id,
     q,
@@ -135,4 +145,26 @@ export const createTask = async ({
     assignee,
     includeEmpty,
   })
+}
+
+export const fetchStatuses = async () => {
+  const response = await fetch(`${apiBaseUrl}/api/create-project/statuses`)
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error?.message || 'Failed to load statuses')
+  }
+  return response.json()
+}
+
+export const createStatus = async ({ name, color }) => {
+  return requestJson(`${apiBaseUrl}/api/create-project/status`, { name, color })
+}
+
+export const fetchUsers = async () => {
+  const response = await fetch(`${apiBaseUrl}/api/users`)
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error?.message || 'Failed to load users')
+  }
+  return response.json()
 }
