@@ -28,7 +28,6 @@
 
 <script setup>
 import { renderAsync } from 'docx-preview'
-import 'docx-preview/dist/docx-preview.css'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps({
@@ -177,6 +176,12 @@ onBeforeUnmount(() => {
 
 .preview-modal__docx :deep(.docx-wrapper) {
   padding: 0;
+}
+
+.preview-modal__docx :deep(.docx) {
+  color: #0f172a;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
 }
 
 .preview-modal__docx {
