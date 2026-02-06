@@ -273,6 +273,10 @@ onMounted(() => {
                         aria-label="編輯日期">
                         ✏️
                       </button>
+                      <label v-if="day.id === selectedDayId" class="tree-day-upload"
+                        :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
+                        ➕
+                      </label>
                       <div
                         v-if="dateFieldProductId === product.id && actionMode === 'rename' && day.id === selectedDayId"
                         class="date-field" @click.stop>
@@ -288,10 +292,6 @@ onMounted(() => {
                           </button>
                         </div>
                       </div>
-                      <label v-if="day.id === selectedDayId" class="tree-day-upload"
-                        :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
-                        ➕
-                      </label>
                       <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
                         class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
                         :disabled="uploading" @change="handleUpload" />
