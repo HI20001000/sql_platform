@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
   buildMeetingDownloadUrl,
@@ -24,6 +24,7 @@ const createFieldProductId = ref(null)
 const renameFieldProductId = ref(null)
 const meetingDate = ref('')
 const renameDate = ref('')
+const renameInputRefs = new Map()
 const uploading = ref(false)
 const uploadError = ref('')
 
@@ -105,6 +106,24 @@ const handleEditDay = (product, meetingDay) => {
   renameFieldProductId.value = product.id
   renameDate.value = meetingDay.meeting_date || ''
   loadFiles()
+  nextTick(() => {
+    const input = renameInputRefs.get(meetingDay.id)
+    if (!input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+    } else {
+      input.focus()
+      input.click()
+    }
+  })
+}
+
+const registerRenameInput = (id) => (element) => {
+  if (element) {
+    renameInputRefs.set(id, element)
+  } else {
+    renameInputRefs.delete(id)
+  }
 }
 
 const handleCreateDay = async () => {
@@ -274,10 +293,14 @@ onMounted(() => {
                         :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
                         ➕
                       </label>
-                      <div v-if="renameFieldProductId === product.id && day.id === selectedDayId"
-                        class="date-field" @click.stop>
-                        <input v-model="renameDate" type="date" @change="handleRenameDay" />
-                      </div>
+                      <input
+                        v-if="renameFieldProductId === product.id && day.id === selectedDayId"
+                        :ref="registerRenameInput(day.id)"
+                        v-model="renameDate"
+                        class="date-field__input--hidden"
+                        type="date"
+                        @change="handleRenameDay"
+                      />
                       <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
                         class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
                         :disabled="uploading" @change="handleUpload" />
@@ -399,6 +422,14 @@ onMounted(() => {
   border-radius: 10px;
   padding: 0.4rem 0.6rem;
   font-size: 0.9rem;
+}
+
+.date-field__input--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .date-field__actions {
