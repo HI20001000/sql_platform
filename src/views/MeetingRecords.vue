@@ -665,6 +665,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .meeting-records {
   height: calc(var(--app-vh, 1vh) * 100);
+  max-height: calc(var(--app-vh, 1vh) * 100);
   background: #f8fafc;
   color: #0f172a;
   display: flex;
@@ -683,6 +684,7 @@ onBeforeUnmount(() => {
   flex: 1;
   padding: 2rem 2.5rem 3rem;
   width: 100%;
+  max-height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -729,6 +731,7 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
   width: 100%;
   flex: 1;
+  max-height: 100%;
   min-height: 0;
   overflow: hidden;
 }
