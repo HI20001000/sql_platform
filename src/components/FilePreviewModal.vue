@@ -15,6 +15,7 @@
           v-else-if="type === 'pdf'"
           class="preview-modal__frame"
           :src="pdfSrc"
+          sandbox="allow-same-origin"
           title="file-preview"
         ></iframe>
         <pre v-else-if="type === 'docx'" class="preview-modal__content">{{ content }}</pre>
