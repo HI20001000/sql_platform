@@ -334,6 +334,8 @@ const handleOpenPreview = async (file) => {
     ? 'pdf'
     : filename.endsWith('.docx')
       ? 'docx'
+      : filename.endsWith('.txt')
+        ? 'text'
       : filename.endsWith('.html') || filename.endsWith('.htm')
         ? 'html'
         : 'text'
@@ -420,11 +422,6 @@ const loadPreview = async () => {
   } finally {
     previewLoading.value = false
   }
-  if (filename.endsWith('.html') || filename.endsWith('.htm')) {
-    previewType.value = 'html'
-    return
-  }
-  previewType.value = 'text'
 }
 
 const formatFileSize = (bytes) => {
