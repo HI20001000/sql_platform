@@ -502,33 +502,66 @@ onBeforeUnmount(() => {
                     </div>
                   </div>
                   <div class="tree-days">
-                    <div v-for="day in product.meeting_days" :key="day.id" class="tree-day-row"
-                      :class="{ active: day.id === selectedDayId }">
-                      <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
-                        🗓️ {{ day.meeting_date }}
-                      </button>
-                      <span v-if="day.id === selectedDayId" class="date-picker-trigger">
-                        <button type="button" class="tree-day-edit"
-                          @click.stop="handleEditDay(product, day)" aria-label="編輯日期">
-                          ✏️
-                        </button>
-                        <input
-                          v-if="renameFieldProductId === product.id && day.id === selectedDayId"
-                          :ref="registerRenameInput(day.id)"
-                          v-model="renameDate"
-                          class="date-picker-input"
-                          type="date"
-                          @change="handleRenameDay"
-                        />
-                      </span>
-                      <label v-if="day.id === selectedDayId" class="tree-day-upload"
-                        :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
-                        ➕
-                      </label>
-                      <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
-                        class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
-                        :disabled="uploading" @change="handleUpload" />
-                    </div>
+                    <div
+  v-for="day in product.meeting_days"
+  :key="day.id"
+  class="tree-day-row"
+  :class="{ active: day.id === selectedDayId }"
+>
+  <button
+    type="button"
+    class="tree-day"
+    @click="handleSelectDay(product, day)"
+  >
+    <span class="tree-day__text">🗓️ {{ day.meeting_date }}</span>
+
+    <span v-if="day.id === selectedDayId" class="tree-day__actions">
+      <!-- edit -->
+      <button
+        type="button"
+        class="tree-day-edit"
+        @click.stop="handleEditDay(product, day)"
+        aria-label="編輯日期"
+      >
+        ✏️
+      </button>
+
+      <!-- upload trigger (label triggers input) -->
+      <label
+        class="tree-day-upload"
+        :class="{ disabled: uploading }"
+        :for="`upload-${day.id}`"
+        aria-label="上傳文件"
+        @click.stop
+      >
+        ➕
+      </label>
+    </span>
+  </button>
+
+  <!-- file input: 放在 button 外面，用 label for 觸發 -->
+  <input
+    v-if="day.id === selectedDayId"
+    :id="`upload-${day.id}`"
+    class="tree-day-upload__input"
+    type="file"
+    multiple
+    accept=".pdf,.txt,.docx"
+    :disabled="uploading"
+    @change="handleUpload"
+  />
+
+  <!-- date picker input：也建議放 button 外面（同樣避免互動元素巢狀） -->
+  <input
+    v-if="renameFieldProductId === product.id && day.id === selectedDayId"
+    :ref="registerRenameInput(day.id)"
+    v-model="renameDate"
+    class="date-picker-input"
+    type="date"
+    @change="handleRenameDay"
+  />
+</div>
+
                     <div v-if="product.meeting_days.length === 0" class="tree-empty">
                       尚未新增日期
                     </div>
@@ -611,15 +644,23 @@ onBeforeUnmount(() => {
   background: #f8fafc;
   color: #0f172a;
   display: flex;
+  height:100vh;
+  overflow: hidden;
+  flex-direction: row;
 }
 
 .content {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 2rem 2.5rem 3rem;
   width: 100%;
+  display:flex;
+  flex-direction: column;
+  overflow:hidden;
 }
 
 .page-header {
+  flex:0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 2rem;
@@ -654,10 +695,12 @@ onBeforeUnmount(() => {
 }
 
 .layout {
-  display: grid;
-  grid-template-columns: 320px minmax(360px, 1fr) minmax(360px, 1fr);
+  display:flex;  
   gap: 1.5rem;
   width: 100%;
+  flex: 1 1 auto;     /* ✅ 關鍵：佔滿 .content 剩餘高度 */
+  min-height: 0;      /* ✅ 關鍵：讓內部的 overflow: auto 生效 */
+  overflow: hidden;   /* ✅ 避免 layout 自己出現卷軸 */
 }
 
 .tree-panel,
@@ -667,10 +710,19 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   padding: 1.5rem;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-  min-height: 520px;
+  height: 100%;       /* ✅ 讓 panel 撐滿 layout 高度 */
+  min-height: 0;      /* ✅ 讓 panel 內部可滾 */
+  overflow: auto;     /* ✅ panel 自己內容超出就滾 */
   display: flex;
   flex-direction: column;
 }
+
+.tree-panel   { flex: 20 1 0; min-width: 220px; }
+.files-panel  { flex: 50 1 0; min-width: 0; }
+.preview-panel{ flex: 30 1 0; min-width: 220px; }
+
+
+
 
 .panel-title {
   font-weight: 700;
@@ -764,10 +816,21 @@ onBeforeUnmount(() => {
   font-size: 0.85rem;
 }
 
-.tree-days {
-  display: grid;
-  gap: 0.4rem;
-  padding-left: 0.5rem;
+.tree-day{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+}
+
+.tree-day__text{
+  min-width:0;
+}
+
+.tree-day__actions{
+  margin-left: auto;           /* ✅ 推到最右邊 */
+  display:inline-flex;
+  align-items:center;
+  gap:.35rem;
 }
 
 .tree-day-row {
