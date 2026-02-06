@@ -16,9 +16,6 @@
         <div v-else-if="type === 'html'" class="preview-modal__html" v-html="htmlContent"></div>
         <pre v-else class="preview-modal__content">{{ textContent }}</pre>
       </div>
-      <div class="preview-modal__actions">
-        <button type="button" class="preview-modal__confirm" @click="handleClose">關閉</button>
-      </div>
     </div>
   </div>
 </template>
