@@ -20,6 +20,7 @@ const filesLoading = ref(false)
 const filesError = ref('')
 const selectedProductId = ref(null)
 const selectedMeetingDay = ref(null)
+const dateFieldProductId = ref(null)
 const meetingDate = ref('')
 const actionMode = ref('create')
 const uploading = ref(false)
@@ -81,6 +82,15 @@ const handleSelectProduct = (product) => {
   selectedProductId.value = product.id
   selectedMeetingDay.value = null
   files.value = []
+}
+
+const handleToggleDateField = (product, mode = null) => {
+  selectedProductId.value = product.id
+  if (mode) {
+    actionMode.value = mode
+  }
+  dateFieldProductId.value =
+    dateFieldProductId.value === product.id && !mode ? null : product.id
 }
 
 const handleSelectDay = (product, meetingDay) => {
@@ -223,16 +233,68 @@ onMounted(() => {
               <div class="tree-project__name">📁 {{ project.name }}</div>
               <div class="tree-project__products">
                 <div v-for="product in project.products" :key="product.id" class="tree-product">
-                  <button class="tree-product__name" :class="{ active: product.id === selectedProductId }" type="button"
-                    @click="handleSelectProduct(product)">
-                    📦 {{ product.name }}
-                  </button>
+                  <div class="tree-product__name" :class="{ active: product.id === selectedProductId }">
+                    <div class="tree-product__header">
+                      <button class="tree-product__select" type="button" @click="handleSelectProduct(product)">
+                        📦 {{ product.name }}
+                      </button>
+                      <div class="tree-product__icons" v-if="product.id === selectedProductId">
+                        <button class="tree-product__icon" type="button"
+                          @click.stop="handleToggleDateField(product, 'create')">
+                          ➕
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="dateFieldProductId === product.id && product.id === selectedProductId && actionMode === 'create'"
+                      class="date-field" @click.stop>
+                      <label>{{ actionMode === 'create' ? '新增日期' : '重新命名' }}</label>
+                      <input v-model="meetingDate" type="date" />
+                      <div class="date-field__actions">
+                        <button type="button" class="primary-button" :disabled="actionMode === 'create'
+                          ? !selectedProductId || !meetingDate
+                          : !selectedDayId || !meetingDate
+                          " @click="handleSubmitDay">
+                          {{ actionMode === 'create' ? '➕' : '🔄' }}
+                        </button>
+                        <button type="button" class="toggle-button" @click="toggleActionMode">
+                          ⇄
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                   <div class="tree-days">
                     <div v-for="day in product.meeting_days" :key="day.id" class="tree-day-row"
                       :class="{ active: day.id === selectedDayId }">
                       <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
                         🗓️ {{ day.meeting_date }}
                       </button>
+                      <button v-if="day.id === selectedDayId" type="button" class="tree-day-edit"
+                        @click.stop="handleSelectDay(product, day); handleToggleDateField(product, 'rename')"
+                        aria-label="編輯日期">
+                        ✏️
+                      </button>
+                      <div
+                        v-if="dateFieldProductId === product.id && actionMode === 'rename' && day.id === selectedDayId"
+                        class="date-field" @click.stop>
+                        <label>重新命名</label>
+                        <input v-model="meetingDate" type="date" />
+                        <div class="date-field__actions">
+                          <button type="button" class="primary-button" :disabled="!selectedDayId || !meetingDate"
+                            @click="handleSubmitDay">
+                            🔄
+                          </button>
+                          <button type="button" class="toggle-button" @click="toggleActionMode">
+                            ⇄
+                          </button>
+                        </div>
+                      </div>
+                      <label v-if="day.id === selectedDayId" class="tree-day-upload"
+                        :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
+                        ➕
+                      </label>
+                      <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
+                        class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
+                        :disabled="uploading" @change="handleUpload" />
                     </div>
                     <div v-if="product.meeting_days.length === 0" class="tree-empty">
                       尚未新增日期
@@ -262,27 +324,6 @@ onMounted(() => {
                 刪除日期
               </button>
             </div>
-          </div>
-          <div class="header-actions">            
-            <div class="date-field">
-              <label>
-                {{ actionMode === 'create' ? '新增日期' : '重新命名' }}
-              </label>
-              <input v-model="meetingDate" type="date" />
-              <div class="date-field__actions">
-                <button type="button" class="primary-button" :disabled="actionMode === 'create'
-                  ? !selectedProductId || !meetingDate
-                  : !selectedDayId || !meetingDate
-                  " @click="handleSubmitDay">
-                  {{ actionMode === 'create' ? '➕' : '🔄' }}
-                </button>
-                <button type="button" class="toggle-button" @click="toggleActionMode">
-                  ⇄
-                </button>
-              </div>
-            </div>
-            <input class="panel-title__left_input" type="file" multiple accept=".pdf,.txt,.docx"
-              :disabled="!selectedDayId || uploading" @change="handleUpload" />
           </div>
           <div v-if="filesLoading" class="state-card">文件載入中...</div>
           <div v-else-if="filesError" class="state-card state-card--error">{{ filesError }}</div>
@@ -346,14 +387,6 @@ onMounted(() => {
 .page-header p {
   margin: 0;
   color: #475569;
-}
-
-.header-actions {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
 }
 
 .date-field {
@@ -481,7 +514,9 @@ onMounted(() => {
 }
 
 .tree-product__name {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
   width: 100%;
   text-align: left;
   background: #f1f5f9;
@@ -489,12 +524,44 @@ onMounted(() => {
   border-radius: 10px;
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.5rem;
-  cursor: pointer;
+  cursor: default;
 }
 
 .tree-product__name.active {
   background: #dbeafe;
   color: #1d4ed8;
+}
+
+.tree-product__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tree-product__select {
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.tree-product__icons {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tree-product__icon {
+  border: none;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.25rem 0.35rem;
+  cursor: pointer;
+  font-size: 0.85rem;
 }
 
 .tree-days {
@@ -507,6 +574,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .tree-day {
@@ -542,34 +610,43 @@ onMounted(() => {
   color: #94a3b8;
 }
 
-.panel-title__left_input[type='file'] {
+.tree-day-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   border: 1px dashed #cbd5f5;
-  padding: 0.75rem;
-  border-radius: 12px;
   background: #f8fafc;
+  color: #2563eb;
   cursor: pointer;
+  font-weight: 700;
 }
 
-.panel-title__left_input[type='file']::file-selector-button {
-  border: none;
-  background: #2563eb;
-  color: #ffffff;
-  padding: 0.5rem 0.9rem;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-right: 0.75rem;
+.tree-day-upload.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.panel-title__left_input[type='file']::-webkit-file-upload-button {
+.tree-day-edit {
   border: none;
-  background: #2563eb;
-  color: #ffffff;
-  padding: 0.5rem 0.9rem;
-  border-radius: 10px;
-  font-weight: 600;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.25rem 0.35rem;
   cursor: pointer;
-  margin-right: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.tree-day-upload__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
 
 .files-table {
