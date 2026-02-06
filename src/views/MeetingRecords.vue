@@ -1,6 +1,7 @@
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
-import FilePreviewModal from '../components/FilePreviewModal.vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import mammoth from 'mammoth'
+import FilePreviewPane from '../components/FilePreviewPane.vue'
 import NoticeModal from '../components/NoticeModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
@@ -35,12 +36,13 @@ const modalTitle = ref('')
 const modalMessage = ref('')
 const modalSuccessItems = ref([])
 const modalErrorItems = ref([])
-const previewOpen = ref(false)
-const previewTitle = ref('')
+const selectedFile = ref(null)
 const previewLoading = ref(false)
 const previewError = ref('')
-const previewType = ref('text')
+const previewContent = ref('')
 const previewUrl = ref('')
+let previewAbortController = null
+let previewObjectUrl = ''
 
 const getCurrentUser = () => {
   try {
@@ -98,6 +100,7 @@ const handleSelectProduct = (product) => {
   selectedProductId.value = product.id
   selectedMeetingDay.value = null
   files.value = []
+  clearPreviewSelection()
 }
 
 const handleToggleDateField = (product) => {
@@ -121,6 +124,7 @@ const handleSelectDay = (product, meetingDay) => {
   selectedProductId.value = product.id
   selectedMeetingDay.value = meetingDay
   loadFiles()
+  clearPreviewSelection()
 }
 
 const handleEditDay = (product, meetingDay) => {
@@ -130,6 +134,7 @@ const handleEditDay = (product, meetingDay) => {
   renameFieldProductId.value = product.id
   renameDate.value = meetingDay.meeting_date || ''
   loadFiles()
+  clearPreviewSelection()
   nextTick(() => {
     const input = renameInputRefs.get(meetingDay.id)
     if (!input) return
@@ -248,6 +253,7 @@ const handleDeleteDay = async (meetingDay) => {
     if (selectedDayId.value === meetingDay.id) {
       selectedMeetingDay.value = null
       files.value = []
+      clearPreviewSelection()
     }
   } catch (error) {
     treeError.value = error?.message || '刪除會議日期失敗'
@@ -262,6 +268,9 @@ const handleDeleteFile = async (file) => {
       filename: file.filename,
     })
     await loadFiles()
+    if (selectedFile.value?.name === file.filename) {
+      clearPreviewSelection()
+    }
   } catch (error) {
     filesError.value = error?.message || '刪除檔案失敗'
   }
@@ -320,26 +329,102 @@ const handleCloseModal = () => {
 
 const handleOpenPreview = async (file) => {
   if (!file?.filename || !selectedDayId.value) return
-  previewTitle.value = file.filename
-  previewError.value = ''
-  previewType.value = 'text'
-  previewUrl.value = downloadUrl(file.filename)
-  previewOpen.value = true
   const filename = file.filename.toLowerCase()
-  if (filename.endsWith('.docx')) {
-    previewType.value = 'docx'
-    return
+  const type = filename.endsWith('.pdf')
+    ? 'pdf'
+    : filename.endsWith('.docx')
+      ? 'docx'
+      : filename.endsWith('.html') || filename.endsWith('.htm')
+        ? 'html'
+        : 'text'
+  selectedFile.value = {
+    id: file.id ?? file.filename,
+    name: file.filename,
+    type,
+    url: downloadUrl(file.filename),
+  }
+  await loadPreview()
+}
+
+const clearPreviewResources = () => {
+  if (previewAbortController) {
+    previewAbortController.abort()
+    previewAbortController = null
+  }
+  if (previewObjectUrl) {
+    URL.revokeObjectURL(previewObjectUrl)
+    previewObjectUrl = ''
+  }
+}
+
+const clearPreviewSelection = () => {
+  clearPreviewResources()
+  selectedFile.value = null
+  previewContent.value = ''
+  previewUrl.value = ''
+  previewError.value = ''
+  previewLoading.value = false
+}
+
+const loadPreview = async () => {
+  if (!selectedFile.value) return
+  clearPreviewResources()
+  previewLoading.value = true
+  previewError.value = ''
+  previewContent.value = ''
+  previewUrl.value = ''
+  previewAbortController = new AbortController()
+
+  try {
+    const response = await fetch(selectedFile.value.url, { signal: previewAbortController.signal })
+    if (!response.ok) {
+      throw new Error('文件載入失敗')
+    }
+    const contentType = response.headers.get('content-type') || ''
+    if (selectedFile.value.type === 'pdf') {
+      if (!contentType.includes('application/pdf')) {
+        throw new Error('回應不是 PDF（可能被導到登入頁或 CORS）')
+      }
+      const blob = await response.blob()
+      previewObjectUrl = URL.createObjectURL(blob)
+      previewUrl.value = previewObjectUrl
+      return
+    }
+    if (selectedFile.value.type === 'docx') {
+      if (
+        !contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document') &&
+        !contentType.includes('application/octet-stream')
+      ) {
+        throw new Error('回應不是 DOCX（可能被導到登入頁或 CORS）')
+      }
+      const buffer = await response.arrayBuffer()
+      const { value } = await mammoth.convertToHtml({ arrayBuffer: buffer })
+      previewContent.value = value || ''
+      return
+    }
+    if (selectedFile.value.type === 'html') {
+      if (!contentType.includes('text/html')) {
+        throw new Error('回應不是 HTML（可能被導到登入頁或 CORS）')
+      }
+      previewContent.value = await response.text()
+      return
+    }
+    if (!contentType.includes('text') && !contentType.includes('json')) {
+      previewContent.value = '此檔案格式不支援預覽，請下載後查看。'
+      return
+    }
+    previewContent.value = await response.text()
+  } catch (error) {
+    if (error?.name === 'AbortError') return
+    previewError.value = error?.message || '文件載入失敗'
+  } finally {
+    previewLoading.value = false
   }
   if (filename.endsWith('.html') || filename.endsWith('.htm')) {
     previewType.value = 'html'
     return
   }
   previewType.value = 'text'
-}
-
-const handleClosePreview = () => {
-  previewOpen.value = false
-  previewUrl.value = ''
 }
 
 const formatFileSize = (bytes) => {
@@ -358,6 +443,10 @@ const downloadUrl = (filename) =>
 onMounted(() => {
   loadTree()
 })
+
+onBeforeUnmount(() => {
+  clearPreviewResources()
+})
 </script>
 
 <template>
@@ -370,15 +459,6 @@ onMounted(() => {
       :success-items="modalSuccessItems"
       :error-items="modalErrorItems"
       @close="handleCloseModal"
-    />
-    <FilePreviewModal
-      :open="previewOpen"
-      :title="previewTitle"
-      :type="previewType"
-      :url="previewUrl"
-      :loading="previewLoading"
-      :error="previewError"
-      @close="handleClosePreview"
     />
     <div class="content">
       <header class="page-header">
@@ -508,6 +588,18 @@ onMounted(() => {
             </div>
           </div>
         </main>
+
+        <aside class="preview-panel">
+          <FilePreviewPane
+            :title="selectedFile?.name || ''"
+            :type="selectedFile?.type || 'text'"
+            :url="previewUrl"
+            :content="previewContent"
+            :loading="previewLoading"
+            :error="previewError"
+            :empty="!selectedFile"
+          />
+        </aside>
       </div>
     </div>
   </section>
@@ -563,18 +655,21 @@ onMounted(() => {
 
 .layout {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 320px minmax(360px, 1fr) minmax(360px, 1fr);
   gap: 1.5rem;
   width: 100%;
 }
 
 .tree-panel,
-.files-panel {
+.files-panel,
+.preview-panel {
   background: #ffffff;
   border-radius: 18px;
   padding: 1.5rem;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
   min-height: 520px;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-title {
@@ -803,5 +898,11 @@ onMounted(() => {
   color: #dc2626;
   font-weight: 600;
   cursor: pointer;
+}
+
+@media (max-width: 1200px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
