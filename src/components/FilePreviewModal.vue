@@ -83,9 +83,9 @@ const renderDocx = async () => {
 }
 
 watch(
-  () => [props.open, props.type, props.buffer],
-  async ([open, type, buffer]) => {
-    if (!open || type !== 'docx' || !buffer) return
+  () => [props.open, props.type, props.buffer, props.loading],
+  async ([open, type, buffer, loading]) => {
+    if (!open || type !== 'docx' || !buffer || loading) return
     await renderDocx()
   }
 )
