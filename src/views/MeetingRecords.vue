@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
+import NoticeModal from '../components/NoticeModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
   buildMeetingDownloadUrl,
@@ -28,6 +29,11 @@ const renameInputRefs = new Map()
 const createInputRefs = new Map()
 const uploading = ref(false)
 const uploadError = ref('')
+const modalOpen = ref(false)
+const modalTitle = ref('')
+const modalMessage = ref('')
+const modalSuccessItems = ref([])
+const modalErrorItems = ref([])
 
 const getCurrentUser = () => {
   try {
@@ -147,6 +153,17 @@ const registerCreateInput = (id) => (element) => {
 
 const handleCreateDay = async () => {
   if (!selectedProductId.value || !meetingDate.value) return
+  const existingDay = selectedProduct.value?.meeting_days?.find(
+    (day) => day.meeting_date === meetingDate.value
+  )
+  if (existingDay) {
+    modalTitle.value = '新增失敗'
+    modalMessage.value = '此日期已存在，請選擇其他日期。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
+    return
+  }
   try {
     const user = getCurrentUser()
     await createMeetingDay({
@@ -155,8 +172,7 @@ const handleCreateDay = async () => {
       createdBy: user?.username || user?.mail || 'system',
     })
     await loadTree()
-    const product = selectedProduct.value
-    const nextDay = product?.meeting_days?.find(
+    const nextDay = selectedProduct.value?.meeting_days?.find(
       (day) => day.meeting_date === meetingDate.value
     )
     if (nextDay) {
@@ -164,8 +180,18 @@ const handleCreateDay = async () => {
       await loadFiles()
     }
     meetingDate.value = ''
+    modalTitle.value = '新增成功'
+    modalMessage.value = '會議日期已成功新增。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
   } catch (error) {
     treeError.value = error?.message || '新增會議日期失敗'
+    modalTitle.value = '新增失敗'
+    modalMessage.value = treeError.value
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
   }
 }
 
@@ -217,22 +243,51 @@ const handleUpload = async (event) => {
   if (!selectedDayId.value) return
   const filesList = event.target.files
   if (!filesList?.length) return
+  const existingFiles = new Set(files.value.map((file) => file.filename))
+  const incomingFiles = Array.from(filesList)
+  const duplicateFiles = incomingFiles
+    .filter((file) => existingFiles.has(file.name))
+    .map((file) => file.name)
+  const uploadableFiles = incomingFiles.filter((file) => !existingFiles.has(file.name))
+  if (!uploadableFiles.length) {
+    modalTitle.value = '上傳結果'
+    modalMessage.value = '已存在相同檔名，沒有新增任何檔案。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = duplicateFiles
+    modalOpen.value = true
+    event.target.value = ''
+    return
+  }
   uploading.value = true
   uploadError.value = ''
   try {
     const user = getCurrentUser()
     await uploadMeetingFiles({
       meetingDayId: selectedDayId.value,
-      files: filesList,
+      files: uploadableFiles,
       uploadedBy: user?.username || user?.mail || 'system',
     })
     await loadFiles()
+    modalTitle.value = '上傳結果'
+    modalMessage.value = ''
+    modalSuccessItems.value = uploadableFiles.map((file) => file.name)
+    modalErrorItems.value = duplicateFiles
+    modalOpen.value = true
     event.target.value = ''
   } catch (error) {
     uploadError.value = error?.message || '上傳失敗'
+    modalTitle.value = '上傳失敗'
+    modalMessage.value = uploadError.value
+    modalSuccessItems.value = []
+    modalErrorItems.value = uploadableFiles.map((file) => file.name)
+    modalOpen.value = true
   } finally {
     uploading.value = false
   }
+}
+
+const handleCloseModal = () => {
+  modalOpen.value = false
 }
 
 const formatFileSize = (bytes) => {
@@ -256,6 +311,14 @@ onMounted(() => {
 <template>
   <section class="meeting-records">
     <Toolbar />
+    <NoticeModal
+      :open="modalOpen"
+      :title="modalTitle"
+      :message="modalMessage"
+      :success-items="modalSuccessItems"
+      :error-items="modalErrorItems"
+      @close="handleCloseModal"
+    />
     <div class="content">
       <header class="page-header">
         <div>
