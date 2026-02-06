@@ -29,7 +29,7 @@
 </template>
 
 <script setup>
-import 'docx-preview/dist/docx-preview.css'
+import '@/styles/docx-preview.css'
 import { renderAsync } from 'docx-preview'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
