@@ -238,17 +238,10 @@ onMounted(() => {
                       <button class="tree-product__select" type="button" @click="handleSelectProduct(product)">
                         📦 {{ product.name }}
                       </button>
-                      <div class="tree-product__icons">
-                        <button class="tree-product__icon" type="button" @click.stop="handleToggleDateField(product)">
-                          📅
-                        </button>
+                      <div class="tree-product__icons" v-if="product.id === selectedProductId">
                         <button class="tree-product__icon" type="button"
                           @click.stop="handleToggleDateField(product, 'create')">
                           ➕
-                        </button>
-                        <button class="tree-product__icon" type="button"
-                          @click.stop="handleToggleDateField(product, 'rename')">
-                          ✏️
                         </button>
                       </div>
                     </div>
@@ -274,6 +267,11 @@ onMounted(() => {
                       :class="{ active: day.id === selectedDayId }">
                       <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
                         🗓️ {{ day.meeting_date }}
+                      </button>
+                      <button v-if="day.id === selectedDayId" type="button" class="tree-day-edit"
+                        @click.stop="handleSelectDay(product, day); handleToggleDateField(product, 'rename')"
+                        aria-label="編輯日期">
+                        ✏️
                       </button>
                       <label v-if="day.id === selectedDayId" class="tree-day-upload"
                         :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
@@ -614,6 +612,15 @@ onMounted(() => {
 .tree-day-upload.disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.tree-day-edit {
+  border: none;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.25rem 0.35rem;
+  cursor: pointer;
+  font-size: 0.85rem;
 }
 
 .tree-day-upload__input {
