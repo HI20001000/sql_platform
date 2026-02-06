@@ -37,12 +37,10 @@ const modalSuccessItems = ref([])
 const modalErrorItems = ref([])
 const previewOpen = ref(false)
 const previewTitle = ref('')
-const previewContent = ref('')
 const previewLoading = ref(false)
 const previewError = ref('')
 const previewType = ref('text')
 const previewUrl = ref('')
-const previewBuffer = ref(null)
 
 const getCurrentUser = () => {
   try {
@@ -323,58 +321,29 @@ const handleCloseModal = () => {
 const handleOpenPreview = async (file) => {
   if (!file?.filename || !selectedDayId.value) return
   previewTitle.value = file.filename
-  previewContent.value = ''
   previewError.value = ''
-  previewLoading.value = true
   previewType.value = 'text'
-  previewUrl.value = ''
-  previewBuffer.value = null
+  previewUrl.value = downloadUrl(file.filename)
   previewOpen.value = true
-  try {
-    const filename = file.filename.toLowerCase()
-    if (filename.endsWith('.pdf')) {
-      previewType.value = 'pdf'
-      previewUrl.value = downloadUrl(file.filename)
-      return
-    }
-    if (filename.endsWith('.docx')) {
-      const response = await fetch(downloadUrl(file.filename))
-      if (!response.ok) {
-        throw new Error('文件載入失敗')
-      }
-      previewType.value = 'docx'
-      previewBuffer.value = await response.arrayBuffer()
-      return
-    }
-    if (filename.endsWith('.txt')) {
-      const response = await fetch(downloadUrl(file.filename))
-      if (!response.ok) {
-        throw new Error('文件載入失敗')
-      }
-      previewContent.value = await response.text()
-      return
-    }
-    const response = await fetch(downloadUrl(file.filename))
-    if (!response.ok) {
-      throw new Error('文件載入失敗')
-    }
-    const contentType = response.headers.get('content-type') || ''
-    if (!contentType.includes('text') && !contentType.includes('json')) {
-      previewContent.value = '此檔案格式不支援預覽，請下載後查看。'
-    } else {
-      previewContent.value = await response.text()
-    }
-  } catch (error) {
-    previewError.value = error?.message || '文件載入失敗'
-  } finally {
-    previewLoading.value = false
+  const filename = file.filename.toLowerCase()
+  if (filename.endsWith('.pdf')) {
+    previewType.value = 'pdf'
+    return
   }
+  if (filename.endsWith('.docx')) {
+    previewType.value = 'docx'
+    return
+  }
+  if (filename.endsWith('.html') || filename.endsWith('.htm')) {
+    previewType.value = 'html'
+    return
+  }
+  previewType.value = 'text'
 }
 
 const handleClosePreview = () => {
   previewOpen.value = false
   previewUrl.value = ''
-  previewBuffer.value = null
 }
 
 const formatFileSize = (bytes) => {
@@ -409,9 +378,7 @@ onMounted(() => {
     <FilePreviewModal
       :open="previewOpen"
       :title="previewTitle"
-      :content="previewContent"
       :type="previewType"
-      :buffer="previewBuffer"
       :url="previewUrl"
       :loading="previewLoading"
       :error="previewError"
