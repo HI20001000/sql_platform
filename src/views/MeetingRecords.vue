@@ -280,18 +280,20 @@ onMounted(() => {
                         📦 {{ product.name }}
                       </button>
                       <div class="tree-product__icons" v-if="product.id === selectedProductId">
-                        <button class="tree-product__icon" type="button"
-                          @click.stop="handleToggleDateField(product)">
-                          ➕
-                        </button>
-                        <input
-                          v-if="createFieldProductId === product.id && product.id === selectedProductId"
-                          :ref="registerCreateInput(product.id)"
-                          v-model="meetingDate"
-                          class="date-field__input--hidden"
-                          type="date"
-                          @change="handleCreateDay"
-                        />
+                        <span class="date-picker-trigger">
+                          <button class="tree-product__icon" type="button"
+                            @click.stop="handleToggleDateField(product)">
+                            ➕
+                          </button>
+                          <input
+                            v-if="createFieldProductId === product.id && product.id === selectedProductId"
+                            :ref="registerCreateInput(product.id)"
+                            v-model="meetingDate"
+                            class="date-picker-input"
+                            type="date"
+                            @change="handleCreateDay"
+                          />
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -301,22 +303,24 @@ onMounted(() => {
                       <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
                         🗓️ {{ day.meeting_date }}
                       </button>
-                      <button v-if="day.id === selectedDayId" type="button" class="tree-day-edit"
-                        @click.stop="handleEditDay(product, day)" aria-label="編輯日期">
-                        ✏️
-                      </button>
+                      <span v-if="day.id === selectedDayId" class="date-picker-trigger">
+                        <button type="button" class="tree-day-edit"
+                          @click.stop="handleEditDay(product, day)" aria-label="編輯日期">
+                          ✏️
+                        </button>
+                        <input
+                          v-if="renameFieldProductId === product.id && day.id === selectedDayId"
+                          :ref="registerRenameInput(day.id)"
+                          v-model="renameDate"
+                          class="date-picker-input"
+                          type="date"
+                          @change="handleRenameDay"
+                        />
+                      </span>
                       <label v-if="day.id === selectedDayId" class="tree-day-upload"
                         :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
                         ➕
                       </label>
-                      <input
-                        v-if="renameFieldProductId === product.id && day.id === selectedDayId"
-                        :ref="registerRenameInput(day.id)"
-                        v-model="renameDate"
-                        class="date-field__input--hidden"
-                        type="date"
-                        @change="handleRenameDay"
-                      />
                       <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
                         class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
                         :disabled="uploading" @change="handleUpload" />
@@ -414,12 +418,21 @@ onMounted(() => {
   color: #475569;
 }
 
-.date-field__input--hidden {
+.date-picker-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.date-picker-input {
   position: absolute;
+  right: 100%;
+  top: 50%;
   width: 1px;
   height: 1px;
   opacity: 0;
   pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .layout {
