@@ -17,6 +17,9 @@ import {
 } from '../scripts/Meetings/api.js'
 
 const tree = ref([])
+// NEW: collapse state for project/product levels
+const expandedProjectIds = ref(new Set())
+const expandedProductIds = ref(new Set())
 const loadingTree = ref(false)
 const treeError = ref('')
 const files = ref([])
@@ -69,6 +72,9 @@ const logScrollDebug = () => {
   const scrollingElement = document.scrollingElement
   if (!scrollingElement) return
   const { scrollHeight, clientHeight } = scrollingElement
+  const docEl = document.documentElement
+  const body = document.body
+  const appRoot = document.querySelector('#app')
   const overflowElements = Array.from(document.body.querySelectorAll('*'))
     .map((element) => {
       const rect = element.getBoundingClientRect()
@@ -88,8 +94,61 @@ const logScrollDebug = () => {
     scrollHeight,
     clientHeight,
     viewportHeight: window.innerHeight,
+    heightChain: {
+      html: docEl ? `${docEl.clientHeight}/${docEl.scrollHeight}` : 'n/a',
+      body: body ? `${body.clientHeight}/${body.scrollHeight}` : 'n/a',
+      app: appRoot ? `${appRoot.clientHeight}/${appRoot.scrollHeight}` : 'n/a',
+    },
     overflowElements,
   })
+}
+
+const reconcileExpandedState = (nextTree) => {
+  const nextProjectIds = new Set()
+  const nextProductIds = new Set()
+
+  nextTree.forEach((project) => {
+    nextProjectIds.add(project.id)
+    if (!expandedProjectIds.value.has(project.id)) {
+      expandedProjectIds.value.add(project.id)
+    }
+    project.products?.forEach((product) => {
+      nextProductIds.add(product.id)
+      if (!expandedProductIds.value.has(product.id)) {
+        expandedProductIds.value.add(product.id)
+      }
+    })
+  })
+
+  expandedProjectIds.value.forEach((id) => {
+    if (!nextProjectIds.has(id)) {
+      expandedProjectIds.value.delete(id)
+    }
+  })
+  expandedProductIds.value.forEach((id) => {
+    if (!nextProductIds.has(id)) {
+      expandedProductIds.value.delete(id)
+    }
+  })
+}
+
+const isProjectExpanded = (id) => expandedProjectIds.value.has(id)
+const isProductExpanded = (id) => expandedProductIds.value.has(id)
+
+const toggleProjectExpanded = (id) => {
+  if (expandedProjectIds.value.has(id)) {
+    expandedProjectIds.value.delete(id)
+  } else {
+    expandedProjectIds.value.add(id)
+  }
+}
+
+const toggleProductExpanded = (id) => {
+  if (expandedProductIds.value.has(id)) {
+    expandedProductIds.value.delete(id)
+  } else {
+    expandedProductIds.value.add(id)
+  }
 }
 
 const loadTree = async () => {
@@ -98,6 +157,8 @@ const loadTree = async () => {
   try {
     const response = await fetchMeetingTree()
     tree.value = response.tree || []
+    // NEW: preserve collapse state while defaulting new ids to expanded
+    reconcileExpandedState(tree.value)
   } catch (error) {
     tree.value = []
     treeError.value = error?.message || '載入會議樹狀資料失敗'
@@ -467,6 +528,7 @@ const downloadUrl = (filename) =>
 
 onMounted(() => {
   document.body.classList.add('meeting-records-page')
+  document.documentElement.classList.add('meeting-records-root')
   loadTree()
   if (import.meta.env.DEV) {
     requestAnimationFrame(() => {
@@ -481,6 +543,7 @@ useAppVh()
 
 onBeforeUnmount(() => {
   document.body.classList.remove('meeting-records-page')
+  document.documentElement.classList.remove('meeting-records-root')
   clearPreviewResources()
 })
 </script>
@@ -514,41 +577,75 @@ onBeforeUnmount(() => {
             <div v-else-if="treeError" class="state-card state-card--error">{{ treeError }}</div>
             <div v-else class="tree">
               <div v-for="project in tree" :key="project.id" class="tree-project">
-                <div class="tree-project__name">📁 {{ project.name }}</div>
-                <div class="tree-project__products">
+                <div class="tree-project__header">
+                  <!-- NEW: project collapse toggle -->
+                  <button
+                    class="tree-project__toggle"
+                    type="button"
+                    @click="toggleProjectExpanded(project.id)"
+                  >
+                    <span class="collapse-indicator">
+                      {{ isProjectExpanded(project.id) ? '▾' : '▸' }}
+                    </span>
+                    <span class="tree-project__title">📁 {{ project.name }}</span>
+                  </button>
+                </div>
+                <div class="tree-project__products" v-show="isProjectExpanded(project.id)">
                   <div v-for="product in project.products" :key="product.id" class="tree-product">
                     <div class="tree-product__name" :class="{ active: product.id === selectedProductId }">
                       <div class="tree-product__header">
                         <button class="tree-product__select" type="button" @click="handleSelectProduct(product)">
                           📦 {{ product.name }}
                         </button>
-                        <div class="tree-product__icons" v-if="product.id === selectedProductId">
-                          <span class="date-picker-trigger">
-                            <button class="tree-product__icon" type="button"
-                              @click.stop="handleToggleDateField(product)">
-                              ➕
-                            </button>
-                            <input
-                              v-if="createFieldProductId === product.id && product.id === selectedProductId"
-                              :ref="registerCreateInput(product.id)"
-                              v-model="meetingDate"
-                              class="date-picker-input"
-                              type="date"
-                              @change="handleCreateDay"
-                            />
-                          </span>
+                        <div class="tree-product__actions">
+                          <!-- NEW: product collapse toggle -->
+                          <button
+                            class="collapse-toggle"
+                            type="button"
+                            @click.stop="toggleProductExpanded(product.id)"
+                            aria-label="切換展開"
+                          >
+                            {{ isProductExpanded(product.id) ? '▾' : '▸' }}
+                          </button>
+                          <div class="tree-product__icons" v-if="product.id === selectedProductId">
+                            <span class="date-picker-trigger">
+                              <button
+                                class="tree-product__icon"
+                                type="button"
+                                @click.stop="handleToggleDateField(product)"
+                              >
+                                ➕
+                              </button>
+                              <input
+                                v-if="createFieldProductId === product.id && product.id === selectedProductId"
+                                :ref="registerCreateInput(product.id)"
+                                v-model="meetingDate"
+                                class="date-picker-input"
+                                type="date"
+                                @change="handleCreateDay"
+                              />
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div class="tree-days">
-                      <div v-for="day in product.meeting_days" :key="day.id" class="tree-day-row"
-                        :class="{ active: day.id === selectedDayId }">
+                    <div class="tree-days" v-show="isProductExpanded(product.id)">
+                      <div
+                        v-for="day in product.meeting_days"
+                        :key="day.id"
+                        class="tree-day-row"
+                        :class="{ active: day.id === selectedDayId }"
+                      >
                         <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
                           🗓️ {{ day.meeting_date }}
                         </button>
                         <span v-if="day.id === selectedDayId" class="date-picker-trigger">
-                          <button type="button" class="tree-day-edit"
-                            @click.stop="handleEditDay(product, day)" aria-label="編輯日期">
+                          <button
+                            type="button"
+                            class="tree-day-edit"
+                            @click.stop="handleEditDay(product, day)"
+                            aria-label="編輯日期"
+                          >
                             ✏️
                           </button>
                           <input
@@ -560,13 +657,25 @@ onBeforeUnmount(() => {
                             @change="handleRenameDay"
                           />
                         </span>
-                        <label v-if="day.id === selectedDayId" class="tree-day-upload"
-                          :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
+                        <label
+                          v-if="day.id === selectedDayId"
+                          class="tree-day-upload"
+                          :class="{ disabled: uploading }"
+                          :for="`upload-${day.id}`"
+                          aria-label="上傳文件"
+                        >
                           ➕
                         </label>
-                        <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
-                          class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
-                          :disabled="uploading" @change="handleUpload" />
+                        <input
+                          v-if="day.id === selectedDayId"
+                          :id="`upload-${day.id}`"
+                          class="tree-day-upload__input"
+                          type="file"
+                          multiple
+                          accept=".pdf,.txt,.docx"
+                          :disabled="uploading"
+                          @change="handleUpload"
+                        />
                       </div>
                       <div v-if="product.meeting_days.length === 0" class="tree-empty">
                         尚未新增日期
@@ -655,14 +764,18 @@ onBeforeUnmount(() => {
 <style scoped>
 .meeting-records {
   height: calc(var(--app-vh, 1vh) * 100);
+  max-height: calc(var(--app-vh, 1vh) * 100);
   background: #f8fafc;
   color: #0f172a;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
 }
 
+:global(html.meeting-records-root),
 :global(body.meeting-records-page) {
+  height: 100%;
   overflow: hidden;
 }
 
@@ -670,6 +783,7 @@ onBeforeUnmount(() => {
   flex: 1;
   padding: 2rem 2.5rem 3rem;
   width: 100%;
+  max-height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -712,11 +826,11 @@ onBeforeUnmount(() => {
 }
 
 .layout {
-  display: grid;
-  grid-template-columns: 320px minmax(360px, 1fr) minmax(360px, 1fr);
+  display: flex;
   gap: 1.5rem;
   width: 100%;
   flex: 1;
+  max-height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -732,6 +846,17 @@ onBeforeUnmount(() => {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+.tree-panel {
+  flex: 0 0 320px;
+  min-width: 280px;
+}
+
+.files-panel,
+.preview-panel {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .panel-header {
@@ -789,6 +914,36 @@ onBeforeUnmount(() => {
   margin-bottom: 0.5rem;
 }
 
+.tree-project__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tree-project__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  border: none;
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: inherit;
+}
+
+.tree-project__title {
+  flex: 1;
+}
+
+.collapse-indicator {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
 .tree-product {
   margin-bottom: 0.9rem;
 }
@@ -819,6 +974,12 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
 }
 
+.tree-product__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .tree-product__select {
   border: none;
   background: transparent;
@@ -827,6 +988,16 @@ onBeforeUnmount(() => {
   cursor: pointer;
   padding: 0;
   text-align: left;
+}
+
+.collapse-toggle {
+  border: none;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #475569;
 }
 
 .tree-product__icons {
@@ -982,7 +1153,12 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1200px) {
   .layout {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .tree-panel {
+    flex: 0 0 auto;
+    width: 100%;
   }
 }
 </style>
