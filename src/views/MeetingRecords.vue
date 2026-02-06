@@ -25,6 +25,7 @@ const renameFieldProductId = ref(null)
 const meetingDate = ref('')
 const renameDate = ref('')
 const renameInputRefs = new Map()
+const createInputRefs = new Map()
 const uploading = ref(false)
 const uploadError = ref('')
 
@@ -89,8 +90,18 @@ const handleSelectProduct = (product) => {
 const handleToggleDateField = (product) => {
   selectedProductId.value = product.id
   renameFieldProductId.value = null
-  createFieldProductId.value =
-    createFieldProductId.value === product.id ? null : product.id
+  createFieldProductId.value = product.id
+  meetingDate.value = ''
+  nextTick(() => {
+    const input = createInputRefs.get(product.id)
+    if (!input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+    } else {
+      input.focus()
+      input.click()
+    }
+  })
 }
 
 const handleSelectDay = (product, meetingDay) => {
@@ -123,6 +134,14 @@ const registerRenameInput = (id) => (element) => {
     renameInputRefs.set(id, element)
   } else {
     renameInputRefs.delete(id)
+  }
+}
+
+const registerCreateInput = (id) => (element) => {
+  if (element) {
+    createInputRefs.set(id, element)
+  } else {
+    createInputRefs.delete(id)
   }
 }
 
@@ -265,17 +284,14 @@ onMounted(() => {
                           @click.stop="handleToggleDateField(product)">
                           ➕
                         </button>
-                      </div>
-                    </div>
-                    <div v-if="createFieldProductId === product.id && product.id === selectedProductId"
-                      class="date-field" @click.stop>
-                      <label>新增日期</label>
-                      <input v-model="meetingDate" type="date" />
-                      <div class="date-field__actions">
-                        <button type="button" class="primary-button"
-                          :disabled="!selectedProductId || !meetingDate" @click="handleCreateDay">
-                          ➕
-                        </button>
+                        <input
+                          v-if="createFieldProductId === product.id && product.id === selectedProductId"
+                          :ref="registerCreateInput(product.id)"
+                          v-model="meetingDate"
+                          class="date-field__input--hidden"
+                          type="date"
+                          @change="handleCreateDay"
+                        />
                       </div>
                     </div>
                   </div>
@@ -398,79 +414,12 @@ onMounted(() => {
   color: #475569;
 }
 
-.date-field {
-  display: flex;
-  gap: 0.75rem;
-  background: #ffffff;
-  padding: 0.75rem 1rem;
-  border-radius: 14px;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
-}
-
-.date-field label {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: #475569;
-}
-
-.date-field input {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.9rem;
-}
-
 .date-field__input--hidden {
   position: absolute;
   width: 1px;
   height: 1px;
   opacity: 0;
   pointer-events: none;
-}
-
-.date-field__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.primary-button,
-.ghost-button {
-  border-radius: 10px;
-  padding: 0.45rem 0.45rem;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.toggle-button {
-  border-radius: 10px;
-  padding: 0.45rem 0.7rem;
-  border: 1px solid #cbd5f5;
-  background: #ffffff;
-  color: #1d4ed8;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.primary-button {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.primary-button:disabled,
-.ghost-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ghost-button {
-  background: #e2e8f0;
-  color: #0f172a;
 }
 
 .layout {
