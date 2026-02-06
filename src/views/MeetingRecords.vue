@@ -197,6 +197,17 @@ const handleCreateDay = async () => {
 
 const handleRenameDay = async () => {
   if (!selectedDayId.value || !renameDate.value) return
+  const existingDay = selectedProduct.value?.meeting_days?.find(
+    (day) => day.meeting_date === renameDate.value
+  )
+  if (existingDay && existingDay.id !== selectedDayId.value) {
+    modalTitle.value = '更新失敗'
+    modalMessage.value = '此日期已存在，請選擇其他日期。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
+    return
+  }
   try {
     await renameMeetingDay({
       meetingDayId: selectedDayId.value,
@@ -207,8 +218,18 @@ const handleRenameDay = async () => {
     const nextDay = product?.meeting_days?.find((day) => day.meeting_date === renameDate.value)
     selectedMeetingDay.value = nextDay || null
     await loadFiles()
+    modalTitle.value = '更新成功'
+    modalMessage.value = '會議日期已成功更新。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
   } catch (error) {
     treeError.value = error?.message || '更新會議日期失敗'
+    modalTitle.value = '更新失敗'
+    modalMessage.value = treeError.value
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
   }
 }
 
