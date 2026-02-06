@@ -237,12 +237,23 @@ onBeforeUnmount(() => {
 
 .preview-modal__docx :deep(.docx-wrapper) {
   padding: 0;
+  background: #ffffff;
 }
 
 .preview-modal__docx :deep(.docx) {
   color: #0f172a;
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   line-height: 1.6;
+}
+
+.preview-modal__docx :deep(.docx-body) {
+  margin: 0;
+}
+
+.preview-modal__docx :deep(.docx-page) {
+  margin: 0 auto 1.5rem;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  background: #ffffff;
 }
 
 .preview-modal__docx {
