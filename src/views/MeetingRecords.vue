@@ -622,6 +622,11 @@ onBeforeUnmount(() => {
   background: #f8fafc;
   color: #0f172a;
   display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:global(body) {
   overflow: hidden;
 }
 
@@ -632,6 +637,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .page-header {
@@ -676,6 +682,7 @@ onBeforeUnmount(() => {
   width: 100%;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .tree-panel,
@@ -685,7 +692,6 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   padding: 1.5rem;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-  min-height: 520px;
   display: flex;
   flex-direction: column;
   min-height: 0;
