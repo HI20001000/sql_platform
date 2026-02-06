@@ -336,10 +336,7 @@ const handleOpenPreview = async (file) => {
       return
     }
     if (filename.endsWith('.docx')) {
-      previewType.value = 'docx'
-      previewUrl.value = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(
-        downloadUrl(file.filename)
-      )}`
+      previewContent.value = '此檔案格式需下載後使用 Word 開啟預覽。'
       return
     }
     const response = await fetch(downloadUrl(file.filename))

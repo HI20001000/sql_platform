@@ -10,7 +10,7 @@
         <div v-if="loading" class="preview-modal__state">載入中...</div>
         <div v-else-if="error" class="preview-modal__state preview-modal__state--error">{{ error }}</div>
         <iframe
-          v-else-if="type === 'pdf' || type === 'docx'"
+          v-else-if="type === 'pdf'"
           class="preview-modal__frame"
           :src="url"
           title="file-preview"
