@@ -42,6 +42,7 @@ const previewLoading = ref(false)
 const previewError = ref('')
 const previewType = ref('text')
 const previewUrl = ref('')
+const previewBuffer = ref(null)
 
 const getCurrentUser = () => {
   try {
@@ -327,6 +328,7 @@ const handleOpenPreview = async (file) => {
   previewLoading.value = true
   previewType.value = 'text'
   previewUrl.value = ''
+  previewBuffer.value = null
   previewOpen.value = true
   try {
     const filename = file.filename.toLowerCase()
@@ -336,7 +338,12 @@ const handleOpenPreview = async (file) => {
       return
     }
     if (filename.endsWith('.docx')) {
-      previewContent.value = '此檔案格式需下載後使用 Word 開啟預覽。'
+      const response = await fetch(downloadUrl(file.filename))
+      if (!response.ok) {
+        throw new Error('文件載入失敗')
+      }
+      previewType.value = 'docx'
+      previewBuffer.value = await response.arrayBuffer()
       return
     }
     const response = await fetch(downloadUrl(file.filename))
@@ -359,6 +366,7 @@ const handleOpenPreview = async (file) => {
 const handleClosePreview = () => {
   previewOpen.value = false
   previewUrl.value = ''
+  previewBuffer.value = null
 }
 
 const formatFileSize = (bytes) => {
@@ -395,6 +403,7 @@ onMounted(() => {
       :title="previewTitle"
       :content="previewContent"
       :type="previewType"
+      :buffer="previewBuffer"
       :url="previewUrl"
       :loading="previewLoading"
       :error="previewError"

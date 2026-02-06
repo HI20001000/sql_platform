@@ -15,6 +15,7 @@
           :src="url"
           title="file-preview"
         ></iframe>
+        <div v-else-if="type === 'docx'" ref="docxContainer" class="preview-modal__docx"></div>
         <div v-else-if="type === 'html'" class="preview-modal__html" v-html="content"></div>
         <pre v-else class="preview-modal__content">{{ content }}</pre>
       </div>
@@ -26,7 +27,10 @@
 </template>
 
 <script setup>
-defineProps({
+import { renderAsync } from 'docx-preview'
+import { onBeforeUnmount, ref, watch } from 'vue'
+
+const props = defineProps({
   open: {
     type: Boolean,
     default: false,
@@ -42,6 +46,10 @@ defineProps({
   type: {
     type: String,
     default: 'text',
+  },
+  buffer: {
+    type: [ArrayBuffer, null],
+    default: null,
   },
   url: {
     type: String,
@@ -62,6 +70,30 @@ const emit = defineEmits(['close'])
 const handleClose = () => {
   emit('close')
 }
+
+const docxContainer = ref(null)
+
+const renderDocx = async () => {
+  if (!docxContainer.value || !props.buffer) return
+  docxContainer.value.innerHTML = ''
+  await renderAsync(props.buffer, docxContainer.value, undefined, {
+    inWrapper: false,
+  })
+}
+
+watch(
+  () => [props.open, props.type, props.buffer],
+  async ([open, type, buffer]) => {
+    if (!open || type !== 'docx' || !buffer) return
+    await renderDocx()
+  }
+)
+
+onBeforeUnmount(() => {
+  if (docxContainer.value) {
+    docxContainer.value.innerHTML = ''
+  }
+})
 </script>
 
 <style scoped>
@@ -139,6 +171,14 @@ const handleClose = () => {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+.preview-modal__docx :deep(.docx-wrapper) {
+  padding: 0;
+}
+
+.preview-modal__docx {
+  width: 100%;
 }
 
 .preview-modal__html {
