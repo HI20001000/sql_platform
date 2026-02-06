@@ -65,6 +65,33 @@ const selectedProduct = computed(() => {
 
 const selectedDayId = computed(() => selectedMeetingDay.value?.id ?? null)
 
+const logScrollDebug = () => {
+  const scrollingElement = document.scrollingElement
+  if (!scrollingElement) return
+  const { scrollHeight, clientHeight } = scrollingElement
+  const overflowElements = Array.from(document.body.querySelectorAll('*'))
+    .map((element) => {
+      const rect = element.getBoundingClientRect()
+      return { element, bottom: rect.bottom, height: rect.height }
+    })
+    .filter((item) => item.bottom > window.innerHeight + 1)
+    .sort((a, b) => b.bottom - a.bottom)
+    .slice(0, 5)
+    .map((item) => ({
+      tag: item.element.tagName.toLowerCase(),
+      class: item.element.className,
+      bottom: Math.round(item.bottom),
+      height: Math.round(item.height),
+    }))
+
+  console.info('[MeetingRecords] scroll debug', {
+    scrollHeight,
+    clientHeight,
+    viewportHeight: window.innerHeight,
+    overflowElements,
+  })
+}
+
 const loadTree = async () => {
   loadingTree.value = true
   treeError.value = ''
@@ -439,12 +466,21 @@ const downloadUrl = (filename) =>
   })
 
 onMounted(() => {
+  document.body.classList.add('meeting-records-page')
   loadTree()
+  if (import.meta.env.DEV) {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        logScrollDebug()
+      }, 0)
+    })
+  }
 })
 
 useAppVh()
 
 onBeforeUnmount(() => {
+  document.body.classList.remove('meeting-records-page')
   clearPreviewResources()
 })
 </script>
@@ -622,6 +658,11 @@ onBeforeUnmount(() => {
   background: #f8fafc;
   color: #0f172a;
   display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:global(body.meeting-records-page) {
   overflow: hidden;
 }
 
@@ -632,6 +673,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .page-header {
@@ -676,6 +718,7 @@ onBeforeUnmount(() => {
   width: 100%;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .tree-panel,
@@ -685,7 +728,6 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   padding: 1.5rem;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-  min-height: 520px;
   display: flex;
   flex-direction: column;
   min-height: 0;
