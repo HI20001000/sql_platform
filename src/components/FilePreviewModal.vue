@@ -7,20 +7,13 @@
         <button type="button" class="preview-modal__close" @click="handleClose">✕</button>
       </div>
       <div class="preview-modal__body">
-        <div v-if="loading" class="preview-modal__state">載入中...</div>
+        <div v-if="displayLoading" class="preview-modal__state">載入中...</div>
         <div v-else-if="displayError" class="preview-modal__state preview-modal__state--error">
           {{ displayError }}
         </div>
-        <iframe
-          v-else-if="type === 'pdf'"
-          class="preview-modal__frame"
-          :src="pdfSrc"
-          sandbox="allow-same-origin"
-          title="file-preview"
-        ></iframe>
-        <pre v-else-if="type === 'docx'" class="preview-modal__content">{{ content }}</pre>
-        <div v-else-if="type === 'html'" class="preview-modal__html" v-html="content"></div>
-        <pre v-else class="preview-modal__content">{{ content }}</pre>
+        <div v-else-if="type === 'docx'" class="preview-modal__docx" v-html="docxHtml"></div>
+        <div v-else-if="type === 'html'" class="preview-modal__html" v-html="htmlContent"></div>
+        <pre v-else class="preview-modal__content">{{ textContent }}</pre>
       </div>
       <div class="preview-modal__actions">
         <button type="button" class="preview-modal__confirm" @click="handleClose">關閉</button>
@@ -30,7 +23,8 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import mammoth from 'mammoth'
 
 const props = defineProps({
   open: {
@@ -41,17 +35,13 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  content: {
+  url: {
     type: String,
     default: '',
   },
   type: {
     type: String,
     default: 'text',
-  },
-  url: {
-    type: String,
-    default: '',
   },
   loading: {
     type: Boolean,
@@ -69,51 +59,109 @@ const handleClose = () => {
   emit('close')
 }
 
+const internalLoading = ref(false)
 const internalError = ref('')
+const textContent = ref('')
+const htmlContent = ref('')
+const docxHtml = ref('')
+
+const displayLoading = computed(() => props.loading || internalLoading.value)
 const displayError = computed(() => props.error || internalError.value)
 
-const pdfSrc = ref('')
-let pdfObjectUrl = ''
-
-const clearPdfObjectUrl = () => {
-  if (pdfObjectUrl) {
-    URL.revokeObjectURL(pdfObjectUrl)
-    pdfObjectUrl = ''
-  }
-  pdfSrc.value = ''
+const resetContent = () => {
+  textContent.value = ''
+  htmlContent.value = ''
+  docxHtml.value = ''
 }
 
-const loadPdf = async () => {
+const loadDocx = async () => {
   if (!props.url) return
+  internalLoading.value = true
+  internalError.value = ''
+  docxHtml.value = ''
+
   const response = await fetch(props.url)
   if (!response.ok) {
-    throw new Error('PDF 載入失敗')
+    throw new Error('DOCX 載入失敗')
   }
-  const blob = await response.blob()
-  pdfObjectUrl = URL.createObjectURL(blob)
-  pdfSrc.value = `${pdfObjectUrl}#toolbar=0`
+  const buffer = await response.arrayBuffer()
+  const { value } = await mammoth.convertToHtml({ arrayBuffer: buffer })
+  docxHtml.value = value || ''
+}
+
+const loadText = async () => {
+  if (!props.url) return
+  internalLoading.value = true
+  internalError.value = ''
+  textContent.value = ''
+
+  const response = await fetch(props.url)
+  if (!response.ok) {
+    throw new Error('文件載入失敗')
+  }
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('text') && !contentType.includes('json')) {
+    textContent.value = '此檔案格式不支援預覽，請下載後查看。'
+    return
+  }
+  textContent.value = await response.text()
+}
+
+const loadHtml = async () => {
+  if (!props.url) return
+  internalLoading.value = true
+  internalError.value = ''
+  htmlContent.value = ''
+
+  const response = await fetch(props.url)
+  if (!response.ok) {
+    throw new Error('文件載入失敗')
+  }
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('text/html')) {
+    throw new Error('非 HTML 檔案，無法預覽')
+  }
+  htmlContent.value = await response.text()
+}
+
+const loadPreview = async () => {
+  resetContent()
+  if (!props.open || !props.url || props.loading) {
+    internalLoading.value = false
+    return
+  }
+
+  try {
+    internalError.value = ''
+    if (props.type === 'docx') {
+      await loadDocx()
+    } else if (props.type === 'html') {
+      await loadHtml()
+    } else {
+      await loadText()
+    }
+  } catch (error) {
+    internalError.value = error?.message || '文件載入失敗'
+  } finally {
+    internalLoading.value = false
+  }
 }
 
 watch(
   () => [props.open, props.type, props.url, props.loading],
-  async ([open, type, url, loading]) => {
-    if (!open || type !== 'pdf' || !url || loading) {
-      clearPdfObjectUrl()
+  async ([open, , , loading]) => {
+    if (!open) {
+      internalLoading.value = false
+      internalError.value = ''
+      resetContent()
       return
     }
-    try {
-      internalError.value = ''
-      clearPdfObjectUrl()
-      await loadPdf()
-    } catch (error) {
-      internalError.value = error?.message || 'PDF 載入失敗'
-    }
-  }
+    if (loading) return
+    await loadPreview()
+  },
+  { flush: 'post' }
 )
 
-onBeforeUnmount(() => {
-  clearPdfObjectUrl()
-})
 </script>
 
 <style scoped>
@@ -187,29 +235,36 @@ onBeforeUnmount(() => {
   color: #0f172a;
 }
 
-.preview-modal__frame {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
 .preview-modal__html {
   color: #0f172a;
   line-height: 1.6;
 }
 
-.preview-modal__actions {
-  display: flex;
-  justify-content: flex-end;
+.preview-modal__docx {
+  font-family: 'Inter', 'Noto Sans TC', system-ui, sans-serif;
+  color: #0f172a;
+  line-height: 1.7;
 }
 
-.preview-modal__confirm {
-  border: none;
-  background: #2563eb;
-  color: #ffffff;
-  border-radius: 10px;
-  padding: 0.45rem 0.9rem;
-  cursor: pointer;
-  font-weight: 600;
+.preview-modal__docx :deep(p) {
+  margin: 0 0 0.9rem;
+}
+
+.preview-modal__docx :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.preview-modal__docx :deep(th),
+.preview-modal__docx :deep(td) {
+  border: 1px solid #e2e8f0;
+  padding: 0.4rem 0.6rem;
+}
+
+.preview-modal__docx :deep(ul),
+.preview-modal__docx :deep(ol) {
+  padding-left: 1.2rem;
+  margin: 0 0 0.9rem;
 }
 </style>
