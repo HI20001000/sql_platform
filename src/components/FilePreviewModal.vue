@@ -15,9 +15,10 @@
           v-else-if="type === 'pdf'"
           class="preview-modal__frame"
           :src="pdfSrc"
+          sandbox="allow-same-origin"
           title="file-preview"
         ></iframe>
-        <div v-else-if="type === 'docx'" ref="docxContainer" class="preview-modal__docx"></div>
+        <pre v-else-if="type === 'docx'" class="preview-modal__content">{{ content }}</pre>
         <div v-else-if="type === 'html'" class="preview-modal__html" v-html="content"></div>
         <pre v-else class="preview-modal__content">{{ content }}</pre>
       </div>
@@ -29,9 +30,7 @@
 </template>
 
 <script setup>
-import 'docx-preview/dist/docx-preview.css'
-import { renderAsync } from 'docx-preview'
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps({
   open: {
@@ -49,10 +48,6 @@ const props = defineProps({
   type: {
     type: String,
     default: 'text',
-  },
-  buffer: {
-    type: [ArrayBuffer, null],
-    default: null,
   },
   url: {
     type: String,
@@ -77,7 +72,6 @@ const handleClose = () => {
 const internalError = ref('')
 const displayError = computed(() => props.error || internalError.value)
 
-const docxContainer = ref(null)
 const pdfSrc = ref('')
 let pdfObjectUrl = ''
 
@@ -100,25 +94,6 @@ const loadPdf = async () => {
   pdfSrc.value = `${pdfObjectUrl}#toolbar=0`
 }
 
-const resolveDocxBuffer = async () => {
-  if (props.buffer) return props.buffer
-  if (!props.url) return null
-  const response = await fetch(props.url)
-  if (!response.ok) {
-    throw new Error('文件載入失敗')
-  }
-  return await response.arrayBuffer()
-}
-
-const renderDocx = async (buffer) => {
-  if (!docxContainer.value || !buffer) return
-  await nextTick()
-  docxContainer.value.innerHTML = ''
-  await renderAsync(buffer, docxContainer.value, undefined, {
-    inWrapper: true,
-  })
-}
-
 watch(
   () => [props.open, props.type, props.url, props.loading],
   async ([open, type, url, loading]) => {
@@ -136,24 +111,7 @@ watch(
   }
 )
 
-watch(
-  () => [props.open, props.type, props.buffer, props.url, props.loading],
-  async ([open, type, buffer, url, loading]) => {
-    if (!open || type !== 'docx' || loading) return
-    try {
-      internalError.value = ''
-      const resolvedBuffer = buffer || (url ? await resolveDocxBuffer() : null)
-      await renderDocx(resolvedBuffer)
-    } catch (error) {
-      internalError.value = error?.message || '文件載入失敗'
-    }
-  }
-)
-
 onBeforeUnmount(() => {
-  if (docxContainer.value) {
-    docxContainer.value.innerHTML = ''
-  }
   clearPdfObjectUrl()
 })
 </script>
@@ -233,31 +191,6 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   border: none;
-}
-
-.preview-modal__docx :deep(.docx-wrapper) {
-  padding: 0;
-  background: #ffffff;
-}
-
-.preview-modal__docx :deep(.docx) {
-  color: #0f172a;
-  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  line-height: 1.6;
-}
-
-.preview-modal__docx :deep(.docx-body) {
-  margin: 0;
-}
-
-.preview-modal__docx :deep(.docx-page) {
-  margin: 0 auto 1.5rem;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
-  background: #ffffff;
-}
-
-.preview-modal__docx {
-  width: 100%;
 }
 
 .preview-modal__html {
