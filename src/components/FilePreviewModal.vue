@@ -28,7 +28,7 @@
 
 <script setup>
 import { renderAsync } from 'docx-preview'
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps({
   open: {
@@ -75,16 +75,17 @@ const docxContainer = ref(null)
 
 const renderDocx = async () => {
   if (!docxContainer.value || !props.buffer) return
+  await nextTick()
   docxContainer.value.innerHTML = ''
   await renderAsync(props.buffer, docxContainer.value, undefined, {
-    inWrapper: false,
+    inWrapper: true,
   })
 }
 
 watch(
-  () => [props.open, props.type, props.buffer],
-  async ([open, type, buffer]) => {
-    if (!open || type !== 'docx' || !buffer) return
+  () => [props.open, props.type, props.buffer, props.loading],
+  async ([open, type, buffer, loading]) => {
+    if (!open || type !== 'docx' || !buffer || loading) return
     await renderDocx()
   }
 )
@@ -175,6 +176,12 @@ onBeforeUnmount(() => {
 
 .preview-modal__docx :deep(.docx-wrapper) {
   padding: 0;
+}
+
+.preview-modal__docx :deep(.docx) {
+  color: #0f172a;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
 }
 
 .preview-modal__docx {

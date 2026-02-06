@@ -346,6 +346,14 @@ const handleOpenPreview = async (file) => {
       previewBuffer.value = await response.arrayBuffer()
       return
     }
+    if (filename.endsWith('.txt')) {
+      const response = await fetch(downloadUrl(file.filename))
+      if (!response.ok) {
+        throw new Error('文件載入失敗')
+      }
+      previewContent.value = await response.text()
+      return
+    }
     const response = await fetch(downloadUrl(file.filename))
     if (!response.ok) {
       throw new Error('文件載入失敗')
