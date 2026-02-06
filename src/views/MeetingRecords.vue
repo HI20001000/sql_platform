@@ -326,10 +326,6 @@ const handleOpenPreview = async (file) => {
   previewUrl.value = downloadUrl(file.filename)
   previewOpen.value = true
   const filename = file.filename.toLowerCase()
-  if (filename.endsWith('.pdf')) {
-    previewType.value = 'pdf'
-    return
-  }
   if (filename.endsWith('.docx')) {
     previewType.value = 'docx'
     return
