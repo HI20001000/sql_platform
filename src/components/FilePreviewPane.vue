@@ -62,6 +62,7 @@ const props = defineProps({
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-height: 0;
 }
 
 .preview-pane__header h3 {
@@ -88,7 +89,6 @@ const props = defineProps({
 
 .preview-pane__empty {
   height: 100%;
-  min-height: 280px;
   border: 1px dashed #cbd5f5;
   border-radius: 12px;
   display: flex;
@@ -113,7 +113,7 @@ const props = defineProps({
   width: 100%;
   height: 100%;
   border: none;
-  min-height: 420px;
+  min-height: 0;
 }
 
 .preview-pane__content {
