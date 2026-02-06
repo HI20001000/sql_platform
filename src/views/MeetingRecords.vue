@@ -69,6 +69,9 @@ const logScrollDebug = () => {
   const scrollingElement = document.scrollingElement
   if (!scrollingElement) return
   const { scrollHeight, clientHeight } = scrollingElement
+  const docEl = document.documentElement
+  const body = document.body
+  const appRoot = document.querySelector('#app')
   const overflowElements = Array.from(document.body.querySelectorAll('*'))
     .map((element) => {
       const rect = element.getBoundingClientRect()
@@ -88,6 +91,11 @@ const logScrollDebug = () => {
     scrollHeight,
     clientHeight,
     viewportHeight: window.innerHeight,
+    heightChain: {
+      html: docEl ? `${docEl.clientHeight}/${docEl.scrollHeight}` : 'n/a',
+      body: body ? `${body.clientHeight}/${body.scrollHeight}` : 'n/a',
+      app: appRoot ? `${appRoot.clientHeight}/${appRoot.scrollHeight}` : 'n/a',
+    },
     overflowElements,
   })
 }
@@ -467,6 +475,7 @@ const downloadUrl = (filename) =>
 
 onMounted(() => {
   document.body.classList.add('meeting-records-page')
+  document.documentElement.classList.add('meeting-records-root')
   loadTree()
   if (import.meta.env.DEV) {
     requestAnimationFrame(() => {
@@ -481,6 +490,7 @@ useAppVh()
 
 onBeforeUnmount(() => {
   document.body.classList.remove('meeting-records-page')
+  document.documentElement.classList.remove('meeting-records-root')
   clearPreviewResources()
 })
 </script>
@@ -659,10 +669,13 @@ onBeforeUnmount(() => {
   color: #0f172a;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
 }
 
+:global(html.meeting-records-root),
 :global(body.meeting-records-page) {
+  height: 100%;
   overflow: hidden;
 }
 
