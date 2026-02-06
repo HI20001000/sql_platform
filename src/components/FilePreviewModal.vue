@@ -9,6 +9,13 @@
       <div class="preview-modal__body">
         <div v-if="loading" class="preview-modal__state">載入中...</div>
         <div v-else-if="error" class="preview-modal__state preview-modal__state--error">{{ error }}</div>
+        <iframe
+          v-else-if="type === 'pdf' || type === 'docx'"
+          class="preview-modal__frame"
+          :src="url"
+          title="file-preview"
+        ></iframe>
+        <div v-else-if="type === 'html'" class="preview-modal__html" v-html="content"></div>
         <pre v-else class="preview-modal__content">{{ content }}</pre>
       </div>
       <div class="preview-modal__actions">
@@ -29,6 +36,14 @@ defineProps({
     default: '',
   },
   content: {
+    type: String,
+    default: '',
+  },
+  type: {
+    type: String,
+    default: 'text',
+  },
+  url: {
     type: String,
     default: '',
   },
@@ -118,6 +133,17 @@ const handleClose = () => {
     'Liberation Mono', 'Courier New', monospace;
   font-size: 0.9rem;
   color: #0f172a;
+}
+
+.preview-modal__frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.preview-modal__html {
+  color: #0f172a;
+  line-height: 1.6;
 }
 
 .preview-modal__actions {

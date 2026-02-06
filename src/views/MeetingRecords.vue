@@ -40,6 +40,8 @@ const previewTitle = ref('')
 const previewContent = ref('')
 const previewLoading = ref(false)
 const previewError = ref('')
+const previewType = ref('text')
+const previewUrl = ref('')
 
 const getCurrentUser = () => {
   try {
@@ -323,8 +325,23 @@ const handleOpenPreview = async (file) => {
   previewContent.value = ''
   previewError.value = ''
   previewLoading.value = true
+  previewType.value = 'text'
+  previewUrl.value = ''
   previewOpen.value = true
   try {
+    const filename = file.filename.toLowerCase()
+    if (filename.endsWith('.pdf')) {
+      previewType.value = 'pdf'
+      previewUrl.value = downloadUrl(file.filename)
+      return
+    }
+    if (filename.endsWith('.docx')) {
+      previewType.value = 'docx'
+      previewUrl.value = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(
+        downloadUrl(file.filename)
+      )}`
+      return
+    }
     const response = await fetch(downloadUrl(file.filename))
     if (!response.ok) {
       throw new Error('文件載入失敗')
@@ -344,6 +361,7 @@ const handleOpenPreview = async (file) => {
 
 const handleClosePreview = () => {
   previewOpen.value = false
+  previewUrl.value = ''
 }
 
 const formatFileSize = (bytes) => {
@@ -379,6 +397,8 @@ onMounted(() => {
       :open="previewOpen"
       :title="previewTitle"
       :content="previewContent"
+      :type="previewType"
+      :url="previewUrl"
       :loading="previewLoading"
       :error="previewError"
       @close="handleClosePreview"
