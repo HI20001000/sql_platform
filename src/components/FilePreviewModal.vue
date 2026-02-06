@@ -28,7 +28,8 @@
 
 <script setup>
 import { renderAsync } from 'docx-preview'
-import { onBeforeUnmount, ref, watch } from 'vue'
+import 'docx-preview/dist/docx-preview.css'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps({
   open: {
@@ -75,9 +76,10 @@ const docxContainer = ref(null)
 
 const renderDocx = async () => {
   if (!docxContainer.value || !props.buffer) return
+  await nextTick()
   docxContainer.value.innerHTML = ''
   await renderAsync(props.buffer, docxContainer.value, undefined, {
-    inWrapper: false,
+    inWrapper: true,
   })
 }
 
