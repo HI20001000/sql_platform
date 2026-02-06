@@ -725,8 +725,7 @@ onBeforeUnmount(() => {
 }
 
 .layout {
-  display: grid;
-  grid-template-columns: 320px minmax(360px, 1fr) minmax(360px, 1fr);
+  display: flex;
   gap: 1.5rem;
   width: 100%;
   flex: 1;
@@ -745,6 +744,17 @@ onBeforeUnmount(() => {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+.tree-panel {
+  flex: 0 0 320px;
+  min-width: 280px;
+}
+
+.files-panel,
+.preview-panel {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .panel-header {
@@ -995,7 +1005,12 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1200px) {
   .layout {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .tree-panel {
+    flex: 0 0 auto;
+    width: 100%;
   }
 }
 </style>
