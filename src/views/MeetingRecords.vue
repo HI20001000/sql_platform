@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import NoticeModal from '../components/NoticeModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
   buildMeetingDownloadUrl,
@@ -20,11 +21,19 @@ const filesLoading = ref(false)
 const filesError = ref('')
 const selectedProductId = ref(null)
 const selectedMeetingDay = ref(null)
-const dateFieldProductId = ref(null)
+const createFieldProductId = ref(null)
+const renameFieldProductId = ref(null)
 const meetingDate = ref('')
-const actionMode = ref('create')
+const renameDate = ref('')
+const renameInputRefs = new Map()
+const createInputRefs = new Map()
 const uploading = ref(false)
 const uploadError = ref('')
+const modalOpen = ref(false)
+const modalTitle = ref('')
+const modalMessage = ref('')
+const modalSuccessItems = ref([])
+const modalErrorItems = ref([])
 
 const getCurrentUser = () => {
   try {
@@ -84,13 +93,21 @@ const handleSelectProduct = (product) => {
   files.value = []
 }
 
-const handleToggleDateField = (product, mode = null) => {
+const handleToggleDateField = (product) => {
   selectedProductId.value = product.id
-  if (mode) {
-    actionMode.value = mode
-  }
-  dateFieldProductId.value =
-    dateFieldProductId.value === product.id && !mode ? null : product.id
+  renameFieldProductId.value = null
+  createFieldProductId.value = product.id
+  meetingDate.value = ''
+  nextTick(() => {
+    const input = createInputRefs.get(product.id)
+    if (!input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+    } else {
+      input.focus()
+      input.click()
+    }
+  })
 }
 
 const handleSelectDay = (product, meetingDay) => {
@@ -99,50 +116,121 @@ const handleSelectDay = (product, meetingDay) => {
   loadFiles()
 }
 
-const handleSubmitDay = async () => {
-  if (actionMode.value === 'create') {
-    if (!selectedProductId.value || !meetingDate.value) return
-    try {
-      const user = getCurrentUser()
-      await createMeetingDay({
-        productId: selectedProductId.value,
-        meetingDate: meetingDate.value,
-        createdBy: user?.username || user?.mail || 'system',
-      })
-      await loadTree()
-      const product = selectedProduct.value
-      const nextDay = product?.meeting_days?.find(
-        (day) => day.meeting_date === meetingDate.value
-      )
-      if (nextDay) {
-        selectedMeetingDay.value = nextDay
-        await loadFiles()
-      }
-      meetingDate.value = ''
-    } catch (error) {
-      treeError.value = error?.message || '新增會議日期失敗'
+const handleEditDay = (product, meetingDay) => {
+  selectedProductId.value = product.id
+  selectedMeetingDay.value = meetingDay
+  createFieldProductId.value = null
+  renameFieldProductId.value = product.id
+  renameDate.value = meetingDay.meeting_date || ''
+  loadFiles()
+  nextTick(() => {
+    const input = renameInputRefs.get(meetingDay.id)
+    if (!input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+    } else {
+      input.focus()
+      input.click()
     }
-    return
-  }
+  })
+}
 
-  if (!selectedDayId.value || !meetingDate.value) return
-  try {
-    await renameMeetingDay({
-      meetingDayId: selectedDayId.value,
-      meetingDate: meetingDate.value,
-    })
-    await loadTree()
-    const product = selectedProduct.value
-    const nextDay = product?.meeting_days?.find((day) => day.meeting_date === meetingDate.value)
-    selectedMeetingDay.value = nextDay || null
-    await loadFiles()
-  } catch (error) {
-    treeError.value = error?.message || '更新會議日期失敗'
+const registerRenameInput = (id) => (element) => {
+  if (element) {
+    renameInputRefs.set(id, element)
+  } else {
+    renameInputRefs.delete(id)
   }
 }
 
-const toggleActionMode = () => {
-  actionMode.value = actionMode.value === 'create' ? 'rename' : 'create'
+const registerCreateInput = (id) => (element) => {
+  if (element) {
+    createInputRefs.set(id, element)
+  } else {
+    createInputRefs.delete(id)
+  }
+}
+
+const handleCreateDay = async () => {
+  if (!selectedProductId.value || !meetingDate.value) return
+  const existingDay = selectedProduct.value?.meeting_days?.find(
+    (day) => day.meeting_date === meetingDate.value
+  )
+  if (existingDay) {
+    modalTitle.value = '新增失敗'
+    modalMessage.value = '此日期已存在，請選擇其他日期。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
+    return
+  }
+  try {
+    const user = getCurrentUser()
+    await createMeetingDay({
+      productId: selectedProductId.value,
+      meetingDate: meetingDate.value,
+      createdBy: user?.username || user?.mail || 'system',
+    })
+    await loadTree()
+    const nextDay = selectedProduct.value?.meeting_days?.find(
+      (day) => day.meeting_date === meetingDate.value
+    )
+    if (nextDay) {
+      selectedMeetingDay.value = nextDay
+      await loadFiles()
+    }
+    meetingDate.value = ''
+    modalTitle.value = '新增成功'
+    modalMessage.value = '會議日期已成功新增。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
+  } catch (error) {
+    treeError.value = error?.message || '新增會議日期失敗'
+    modalTitle.value = '新增失敗'
+    modalMessage.value = treeError.value
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
+  }
+}
+
+const handleRenameDay = async () => {
+  if (!selectedDayId.value || !renameDate.value) return
+  const existingDay = selectedProduct.value?.meeting_days?.find(
+    (day) => day.meeting_date === renameDate.value
+  )
+  if (existingDay && existingDay.id !== selectedDayId.value) {
+    modalTitle.value = '更新失敗'
+    modalMessage.value = '此日期已存在，請選擇其他日期。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
+    return
+  }
+  try {
+    await renameMeetingDay({
+      meetingDayId: selectedDayId.value,
+      meetingDate: renameDate.value,
+    })
+    await loadTree()
+    const product = selectedProduct.value
+    const nextDay = product?.meeting_days?.find((day) => day.meeting_date === renameDate.value)
+    selectedMeetingDay.value = nextDay || null
+    await loadFiles()
+    modalTitle.value = '更新成功'
+    modalMessage.value = '會議日期已成功更新。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
+  } catch (error) {
+    treeError.value = error?.message || '更新會議日期失敗'
+    modalTitle.value = '更新失敗'
+    modalMessage.value = treeError.value
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
+  }
 }
 
 const handleDeleteDay = async (meetingDay) => {
@@ -176,22 +264,51 @@ const handleUpload = async (event) => {
   if (!selectedDayId.value) return
   const filesList = event.target.files
   if (!filesList?.length) return
+  const existingFiles = new Set(files.value.map((file) => file.filename))
+  const incomingFiles = Array.from(filesList)
+  const duplicateFiles = incomingFiles
+    .filter((file) => existingFiles.has(file.name))
+    .map((file) => file.name)
+  const uploadableFiles = incomingFiles.filter((file) => !existingFiles.has(file.name))
+  if (!uploadableFiles.length) {
+    modalTitle.value = '上傳結果'
+    modalMessage.value = '已存在相同檔名，沒有新增任何檔案。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = duplicateFiles
+    modalOpen.value = true
+    event.target.value = ''
+    return
+  }
   uploading.value = true
   uploadError.value = ''
   try {
     const user = getCurrentUser()
     await uploadMeetingFiles({
       meetingDayId: selectedDayId.value,
-      files: filesList,
+      files: uploadableFiles,
       uploadedBy: user?.username || user?.mail || 'system',
     })
     await loadFiles()
+    modalTitle.value = '上傳結果'
+    modalMessage.value = ''
+    modalSuccessItems.value = uploadableFiles.map((file) => file.name)
+    modalErrorItems.value = duplicateFiles
+    modalOpen.value = true
     event.target.value = ''
   } catch (error) {
     uploadError.value = error?.message || '上傳失敗'
+    modalTitle.value = '上傳失敗'
+    modalMessage.value = uploadError.value
+    modalSuccessItems.value = []
+    modalErrorItems.value = uploadableFiles.map((file) => file.name)
+    modalOpen.value = true
   } finally {
     uploading.value = false
   }
+}
+
+const handleCloseModal = () => {
+  modalOpen.value = false
 }
 
 const formatFileSize = (bytes) => {
@@ -215,6 +332,14 @@ onMounted(() => {
 <template>
   <section class="meeting-records">
     <Toolbar />
+    <NoticeModal
+      :open="modalOpen"
+      :title="modalTitle"
+      :message="modalMessage"
+      :success-items="modalSuccessItems"
+      :error-items="modalErrorItems"
+      @close="handleCloseModal"
+    />
     <div class="content">
       <header class="page-header">
         <div>
@@ -239,26 +364,20 @@ onMounted(() => {
                         📦 {{ product.name }}
                       </button>
                       <div class="tree-product__icons" v-if="product.id === selectedProductId">
-                        <button class="tree-product__icon" type="button"
-                          @click.stop="handleToggleDateField(product, 'create')">
-                          ➕
-                        </button>
-                      </div>
-                    </div>
-                    <div v-if="dateFieldProductId === product.id && product.id === selectedProductId && actionMode === 'create'"
-                      class="date-field" @click.stop>
-                      <label>{{ actionMode === 'create' ? '新增日期' : '重新命名' }}</label>
-                      <input v-model="meetingDate" type="date" />
-                      <div class="date-field__actions">
-                        <button type="button" class="primary-button" :disabled="actionMode === 'create'
-                          ? !selectedProductId || !meetingDate
-                          : !selectedDayId || !meetingDate
-                          " @click="handleSubmitDay">
-                          {{ actionMode === 'create' ? '➕' : '🔄' }}
-                        </button>
-                        <button type="button" class="toggle-button" @click="toggleActionMode">
-                          ⇄
-                        </button>
+                        <span class="date-picker-trigger">
+                          <button class="tree-product__icon" type="button"
+                            @click.stop="handleToggleDateField(product)">
+                            ➕
+                          </button>
+                          <input
+                            v-if="createFieldProductId === product.id && product.id === selectedProductId"
+                            :ref="registerCreateInput(product.id)"
+                            v-model="meetingDate"
+                            class="date-picker-input"
+                            type="date"
+                            @change="handleCreateDay"
+                          />
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -268,30 +387,24 @@ onMounted(() => {
                       <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
                         🗓️ {{ day.meeting_date }}
                       </button>
-                      <button v-if="day.id === selectedDayId" type="button" class="tree-day-edit"
-                        @click.stop="handleSelectDay(product, day); handleToggleDateField(product, 'rename')"
-                        aria-label="編輯日期">
-                        ✏️
-                      </button>
+                      <span v-if="day.id === selectedDayId" class="date-picker-trigger">
+                        <button type="button" class="tree-day-edit"
+                          @click.stop="handleEditDay(product, day)" aria-label="編輯日期">
+                          ✏️
+                        </button>
+                        <input
+                          v-if="renameFieldProductId === product.id && day.id === selectedDayId"
+                          :ref="registerRenameInput(day.id)"
+                          v-model="renameDate"
+                          class="date-picker-input"
+                          type="date"
+                          @change="handleRenameDay"
+                        />
+                      </span>
                       <label v-if="day.id === selectedDayId" class="tree-day-upload"
                         :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
                         ➕
                       </label>
-                      <div
-                        v-if="dateFieldProductId === product.id && actionMode === 'rename' && day.id === selectedDayId"
-                        class="date-field" @click.stop>
-                        <label>重新命名</label>
-                        <input v-model="meetingDate" type="date" />
-                        <div class="date-field__actions">
-                          <button type="button" class="primary-button" :disabled="!selectedDayId || !meetingDate"
-                            @click="handleSubmitDay">
-                            🔄
-                          </button>
-                          <button type="button" class="toggle-button" @click="toggleActionMode">
-                            ⇄
-                          </button>
-                        </div>
-                      </div>
                       <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
                         class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
                         :disabled="uploading" @change="handleUpload" />
@@ -389,71 +502,21 @@ onMounted(() => {
   color: #475569;
 }
 
-.date-field {
-  display: flex;
-  gap: 0.75rem;
-  background: #ffffff;
-  padding: 0.75rem 1rem;
-  border-radius: 14px;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
-}
-
-.date-field label {
-  display: flex;
-  flex-direction: row;
+.date-picker-trigger {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: #475569;
 }
 
-.date-field input {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.9rem;
-}
-
-.date-field__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.primary-button,
-.ghost-button {
-  border-radius: 10px;
-  padding: 0.45rem 0.45rem;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.toggle-button {
-  border-radius: 10px;
-  padding: 0.45rem 0.7rem;
-  border: 1px solid #cbd5f5;
-  background: #ffffff;
-  color: #1d4ed8;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.primary-button {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.primary-button:disabled,
-.ghost-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ghost-button {
-  background: #e2e8f0;
-  color: #0f172a;
+.date-picker-input {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .layout {
