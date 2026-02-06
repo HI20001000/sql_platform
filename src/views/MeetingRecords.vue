@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
   buildMeetingDownloadUrl,
@@ -20,9 +20,12 @@ const filesLoading = ref(false)
 const filesError = ref('')
 const selectedProductId = ref(null)
 const selectedMeetingDay = ref(null)
-const dateFieldProductId = ref(null)
+const createFieldProductId = ref(null)
+const renameFieldProductId = ref(null)
 const meetingDate = ref('')
-const actionMode = ref('create')
+const renameDate = ref('')
+const renameInputRefs = new Map()
+const createInputRefs = new Map()
 const uploading = ref(false)
 const uploadError = ref('')
 
@@ -84,13 +87,21 @@ const handleSelectProduct = (product) => {
   files.value = []
 }
 
-const handleToggleDateField = (product, mode = null) => {
+const handleToggleDateField = (product) => {
   selectedProductId.value = product.id
-  if (mode) {
-    actionMode.value = mode
-  }
-  dateFieldProductId.value =
-    dateFieldProductId.value === product.id && !mode ? null : product.id
+  renameFieldProductId.value = null
+  createFieldProductId.value = product.id
+  meetingDate.value = ''
+  nextTick(() => {
+    const input = createInputRefs.get(product.id)
+    if (!input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+    } else {
+      input.focus()
+      input.click()
+    }
+  })
 }
 
 const handleSelectDay = (product, meetingDay) => {
@@ -99,50 +110,80 @@ const handleSelectDay = (product, meetingDay) => {
   loadFiles()
 }
 
-const handleSubmitDay = async () => {
-  if (actionMode.value === 'create') {
-    if (!selectedProductId.value || !meetingDate.value) return
-    try {
-      const user = getCurrentUser()
-      await createMeetingDay({
-        productId: selectedProductId.value,
-        meetingDate: meetingDate.value,
-        createdBy: user?.username || user?.mail || 'system',
-      })
-      await loadTree()
-      const product = selectedProduct.value
-      const nextDay = product?.meeting_days?.find(
-        (day) => day.meeting_date === meetingDate.value
-      )
-      if (nextDay) {
-        selectedMeetingDay.value = nextDay
-        await loadFiles()
-      }
-      meetingDate.value = ''
-    } catch (error) {
-      treeError.value = error?.message || '新增會議日期失敗'
+const handleEditDay = (product, meetingDay) => {
+  selectedProductId.value = product.id
+  selectedMeetingDay.value = meetingDay
+  createFieldProductId.value = null
+  renameFieldProductId.value = product.id
+  renameDate.value = meetingDay.meeting_date || ''
+  loadFiles()
+  nextTick(() => {
+    const input = renameInputRefs.get(meetingDay.id)
+    if (!input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+    } else {
+      input.focus()
+      input.click()
     }
-    return
-  }
+  })
+}
 
-  if (!selectedDayId.value || !meetingDate.value) return
+const registerRenameInput = (id) => (element) => {
+  if (element) {
+    renameInputRefs.set(id, element)
+  } else {
+    renameInputRefs.delete(id)
+  }
+}
+
+const registerCreateInput = (id) => (element) => {
+  if (element) {
+    createInputRefs.set(id, element)
+  } else {
+    createInputRefs.delete(id)
+  }
+}
+
+const handleCreateDay = async () => {
+  if (!selectedProductId.value || !meetingDate.value) return
   try {
-    await renameMeetingDay({
-      meetingDayId: selectedDayId.value,
+    const user = getCurrentUser()
+    await createMeetingDay({
+      productId: selectedProductId.value,
       meetingDate: meetingDate.value,
+      createdBy: user?.username || user?.mail || 'system',
     })
     await loadTree()
     const product = selectedProduct.value
-    const nextDay = product?.meeting_days?.find((day) => day.meeting_date === meetingDate.value)
+    const nextDay = product?.meeting_days?.find(
+      (day) => day.meeting_date === meetingDate.value
+    )
+    if (nextDay) {
+      selectedMeetingDay.value = nextDay
+      await loadFiles()
+    }
+    meetingDate.value = ''
+  } catch (error) {
+    treeError.value = error?.message || '新增會議日期失敗'
+  }
+}
+
+const handleRenameDay = async () => {
+  if (!selectedDayId.value || !renameDate.value) return
+  try {
+    await renameMeetingDay({
+      meetingDayId: selectedDayId.value,
+      meetingDate: renameDate.value,
+    })
+    await loadTree()
+    const product = selectedProduct.value
+    const nextDay = product?.meeting_days?.find((day) => day.meeting_date === renameDate.value)
     selectedMeetingDay.value = nextDay || null
     await loadFiles()
   } catch (error) {
     treeError.value = error?.message || '更新會議日期失敗'
   }
-}
-
-const toggleActionMode = () => {
-  actionMode.value = actionMode.value === 'create' ? 'rename' : 'create'
 }
 
 const handleDeleteDay = async (meetingDay) => {
@@ -240,25 +281,17 @@ onMounted(() => {
                       </button>
                       <div class="tree-product__icons" v-if="product.id === selectedProductId">
                         <button class="tree-product__icon" type="button"
-                          @click.stop="handleToggleDateField(product, 'create')">
+                          @click.stop="handleToggleDateField(product)">
                           ➕
                         </button>
-                      </div>
-                    </div>
-                    <div v-if="dateFieldProductId === product.id && product.id === selectedProductId && actionMode === 'create'"
-                      class="date-field" @click.stop>
-                      <label>{{ actionMode === 'create' ? '新增日期' : '重新命名' }}</label>
-                      <input v-model="meetingDate" type="date" />
-                      <div class="date-field__actions">
-                        <button type="button" class="primary-button" :disabled="actionMode === 'create'
-                          ? !selectedProductId || !meetingDate
-                          : !selectedDayId || !meetingDate
-                          " @click="handleSubmitDay">
-                          {{ actionMode === 'create' ? '➕' : '🔄' }}
-                        </button>
-                        <button type="button" class="toggle-button" @click="toggleActionMode">
-                          ⇄
-                        </button>
+                        <input
+                          v-if="createFieldProductId === product.id && product.id === selectedProductId"
+                          :ref="registerCreateInput(product.id)"
+                          v-model="meetingDate"
+                          class="date-field__input--hidden"
+                          type="date"
+                          @change="handleCreateDay"
+                        />
                       </div>
                     </div>
                   </div>
@@ -269,29 +302,21 @@ onMounted(() => {
                         🗓️ {{ day.meeting_date }}
                       </button>
                       <button v-if="day.id === selectedDayId" type="button" class="tree-day-edit"
-                        @click.stop="handleSelectDay(product, day); handleToggleDateField(product, 'rename')"
-                        aria-label="編輯日期">
+                        @click.stop="handleEditDay(product, day)" aria-label="編輯日期">
                         ✏️
                       </button>
                       <label v-if="day.id === selectedDayId" class="tree-day-upload"
                         :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
                         ➕
                       </label>
-                      <div
-                        v-if="dateFieldProductId === product.id && actionMode === 'rename' && day.id === selectedDayId"
-                        class="date-field" @click.stop>
-                        <label>重新命名</label>
-                        <input v-model="meetingDate" type="date" />
-                        <div class="date-field__actions">
-                          <button type="button" class="primary-button" :disabled="!selectedDayId || !meetingDate"
-                            @click="handleSubmitDay">
-                            🔄
-                          </button>
-                          <button type="button" class="toggle-button" @click="toggleActionMode">
-                            ⇄
-                          </button>
-                        </div>
-                      </div>
+                      <input
+                        v-if="renameFieldProductId === product.id && day.id === selectedDayId"
+                        :ref="registerRenameInput(day.id)"
+                        v-model="renameDate"
+                        class="date-field__input--hidden"
+                        type="date"
+                        @change="handleRenameDay"
+                      />
                       <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
                         class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
                         :disabled="uploading" @change="handleUpload" />
@@ -389,71 +414,12 @@ onMounted(() => {
   color: #475569;
 }
 
-.date-field {
-  display: flex;
-  gap: 0.75rem;
-  background: #ffffff;
-  padding: 0.75rem 1rem;
-  border-radius: 14px;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
-}
-
-.date-field label {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: #475569;
-}
-
-.date-field input {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.9rem;
-}
-
-.date-field__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.primary-button,
-.ghost-button {
-  border-radius: 10px;
-  padding: 0.45rem 0.45rem;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.toggle-button {
-  border-radius: 10px;
-  padding: 0.45rem 0.7rem;
-  border: 1px solid #cbd5f5;
-  background: #ffffff;
-  color: #1d4ed8;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.primary-button {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.primary-button:disabled,
-.ghost-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ghost-button {
-  background: #e2e8f0;
-  color: #0f172a;
+.date-field__input--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .layout {
