@@ -65,6 +65,33 @@ const selectedProduct = computed(() => {
 
 const selectedDayId = computed(() => selectedMeetingDay.value?.id ?? null)
 
+const logScrollDebug = () => {
+  const scrollingElement = document.scrollingElement
+  if (!scrollingElement) return
+  const { scrollHeight, clientHeight } = scrollingElement
+  const overflowElements = Array.from(document.body.querySelectorAll('*'))
+    .map((element) => {
+      const rect = element.getBoundingClientRect()
+      return { element, bottom: rect.bottom, height: rect.height }
+    })
+    .filter((item) => item.bottom > window.innerHeight + 1)
+    .sort((a, b) => b.bottom - a.bottom)
+    .slice(0, 5)
+    .map((item) => ({
+      tag: item.element.tagName.toLowerCase(),
+      class: item.element.className,
+      bottom: Math.round(item.bottom),
+      height: Math.round(item.height),
+    }))
+
+  console.info('[MeetingRecords] scroll debug', {
+    scrollHeight,
+    clientHeight,
+    viewportHeight: window.innerHeight,
+    overflowElements,
+  })
+}
+
 const loadTree = async () => {
   loadingTree.value = true
   treeError.value = ''
@@ -439,12 +466,21 @@ const downloadUrl = (filename) =>
   })
 
 onMounted(() => {
+  document.body.classList.add('meeting-records-page')
   loadTree()
+  if (import.meta.env.DEV) {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        logScrollDebug()
+      }, 0)
+    })
+  }
 })
 
 useAppVh()
 
 onBeforeUnmount(() => {
+  document.body.classList.remove('meeting-records-page')
   clearPreviewResources()
 })
 </script>
@@ -626,7 +662,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-:global(body) {
+:global(body.meeting-records-page) {
   overflow: hidden;
 }
 
