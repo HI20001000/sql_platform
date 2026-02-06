@@ -245,7 +245,7 @@ onMounted(() => {
                         </button>
                       </div>
                     </div>
-                    <div v-if="dateFieldProductId === product.id && product.id === selectedProductId && actionMode === 'create'"
+                    <div v-if="dateFieldProductId === product.id && product.id === selectedProductId"
                       class="date-field" @click.stop>
                       <label>{{ actionMode === 'create' ? '新增日期' : '重新命名' }}</label>
                       <input v-model="meetingDate" type="date" />
@@ -277,21 +277,6 @@ onMounted(() => {
                         :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
                         ➕
                       </label>
-                      <div
-                        v-if="dateFieldProductId === product.id && actionMode === 'rename' && day.id === selectedDayId"
-                        class="date-field" @click.stop>
-                        <label>重新命名</label>
-                        <input v-model="meetingDate" type="date" />
-                        <div class="date-field__actions">
-                          <button type="button" class="primary-button" :disabled="!selectedDayId || !meetingDate"
-                            @click="handleSubmitDay">
-                            🔄
-                          </button>
-                          <button type="button" class="toggle-button" @click="toggleActionMode">
-                            ⇄
-                          </button>
-                        </div>
-                      </div>
                       <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
                         class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
                         :disabled="uploading" @change="handleUpload" />
