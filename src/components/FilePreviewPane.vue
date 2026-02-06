@@ -75,6 +75,7 @@ const props = defineProps({
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-height: 0;
 }
 
 .preview-pane__state {

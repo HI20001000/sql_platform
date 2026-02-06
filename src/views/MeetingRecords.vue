@@ -4,6 +4,7 @@ import mammoth from 'mammoth'
 import FilePreviewPane from '../components/FilePreviewPane.vue'
 import NoticeModal from '../components/NoticeModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
+import { useAppVh } from '../composables/useAppVh.js'
 import {
   buildMeetingDownloadUrl,
   createMeetingDay,
@@ -441,6 +442,8 @@ onMounted(() => {
   loadTree()
 })
 
+useAppVh()
+
 onBeforeUnmount(() => {
   clearPreviewResources()
 })
@@ -467,135 +470,146 @@ onBeforeUnmount(() => {
 
       <div class="layout">
         <aside class="tree-panel">
-          <div class="panel-title">產品資料夾</div>
-          <div v-if="loadingTree" class="state-card">載入中...</div>
-          <div v-else-if="treeError" class="state-card state-card--error">{{ treeError }}</div>
-          <div v-else class="tree">
-            <div v-for="project in tree" :key="project.id" class="tree-project">
-              <div class="tree-project__name">📁 {{ project.name }}</div>
-              <div class="tree-project__products">
-                <div v-for="product in project.products" :key="product.id" class="tree-product">
-                  <div class="tree-product__name" :class="{ active: product.id === selectedProductId }">
-                    <div class="tree-product__header">
-                      <button class="tree-product__select" type="button" @click="handleSelectProduct(product)">
-                        📦 {{ product.name }}
-                      </button>
-                      <div class="tree-product__icons" v-if="product.id === selectedProductId">
-                        <span class="date-picker-trigger">
-                          <button class="tree-product__icon" type="button"
-                            @click.stop="handleToggleDateField(product)">
-                            ➕
-                          </button>
-                          <input
-                            v-if="createFieldProductId === product.id && product.id === selectedProductId"
-                            :ref="registerCreateInput(product.id)"
-                            v-model="meetingDate"
-                            class="date-picker-input"
-                            type="date"
-                            @change="handleCreateDay"
-                          />
-                        </span>
+          <div class="panel-header">
+            <div class="panel-title">產品資料夾</div>
+          </div>
+          <div class="panel-body">
+            <div v-if="loadingTree" class="state-card">載入中...</div>
+            <div v-else-if="treeError" class="state-card state-card--error">{{ treeError }}</div>
+            <div v-else class="tree">
+              <div v-for="project in tree" :key="project.id" class="tree-project">
+                <div class="tree-project__name">📁 {{ project.name }}</div>
+                <div class="tree-project__products">
+                  <div v-for="product in project.products" :key="product.id" class="tree-product">
+                    <div class="tree-product__name" :class="{ active: product.id === selectedProductId }">
+                      <div class="tree-product__header">
+                        <button class="tree-product__select" type="button" @click="handleSelectProduct(product)">
+                          📦 {{ product.name }}
+                        </button>
+                        <div class="tree-product__icons" v-if="product.id === selectedProductId">
+                          <span class="date-picker-trigger">
+                            <button class="tree-product__icon" type="button"
+                              @click.stop="handleToggleDateField(product)">
+                              ➕
+                            </button>
+                            <input
+                              v-if="createFieldProductId === product.id && product.id === selectedProductId"
+                              :ref="registerCreateInput(product.id)"
+                              v-model="meetingDate"
+                              class="date-picker-input"
+                              type="date"
+                              @change="handleCreateDay"
+                            />
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div class="tree-days">
-                    <div v-for="day in product.meeting_days" :key="day.id" class="tree-day-row"
-                      :class="{ active: day.id === selectedDayId }">
-                      <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
-                        🗓️ {{ day.meeting_date }}
-                      </button>
-                      <span v-if="day.id === selectedDayId" class="date-picker-trigger">
-                        <button type="button" class="tree-day-edit"
-                          @click.stop="handleEditDay(product, day)" aria-label="編輯日期">
-                          ✏️
+                    <div class="tree-days">
+                      <div v-for="day in product.meeting_days" :key="day.id" class="tree-day-row"
+                        :class="{ active: day.id === selectedDayId }">
+                        <button type="button" class="tree-day" @click="handleSelectDay(product, day)">
+                          🗓️ {{ day.meeting_date }}
                         </button>
-                        <input
-                          v-if="renameFieldProductId === product.id && day.id === selectedDayId"
-                          :ref="registerRenameInput(day.id)"
-                          v-model="renameDate"
-                          class="date-picker-input"
-                          type="date"
-                          @change="handleRenameDay"
-                        />
-                      </span>
-                      <label v-if="day.id === selectedDayId" class="tree-day-upload"
-                        :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
-                        ➕
-                      </label>
-                      <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
-                        class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
-                        :disabled="uploading" @change="handleUpload" />
-                    </div>
-                    <div v-if="product.meeting_days.length === 0" class="tree-empty">
-                      尚未新增日期
+                        <span v-if="day.id === selectedDayId" class="date-picker-trigger">
+                          <button type="button" class="tree-day-edit"
+                            @click.stop="handleEditDay(product, day)" aria-label="編輯日期">
+                            ✏️
+                          </button>
+                          <input
+                            v-if="renameFieldProductId === product.id && day.id === selectedDayId"
+                            :ref="registerRenameInput(day.id)"
+                            v-model="renameDate"
+                            class="date-picker-input"
+                            type="date"
+                            @change="handleRenameDay"
+                          />
+                        </span>
+                        <label v-if="day.id === selectedDayId" class="tree-day-upload"
+                          :class="{ disabled: uploading }" :for="`upload-${day.id}`" aria-label="上傳文件">
+                          ➕
+                        </label>
+                        <input v-if="day.id === selectedDayId" :id="`upload-${day.id}`"
+                          class="tree-day-upload__input" type="file" multiple accept=".pdf,.txt,.docx"
+                          :disabled="uploading" @change="handleUpload" />
+                      </div>
+                      <div v-if="product.meeting_days.length === 0" class="tree-empty">
+                        尚未新增日期
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+              <div v-if="tree.length === 0" class="tree-empty">尚未建立專案/產品。</div>
             </div>
-            <div v-if="tree.length === 0" class="tree-empty">尚未建立專案/產品。</div>
           </div>
         </aside>
 
         <main class="files-panel">
-          <div class="panel-title panel-title--split">
-            <div class="panel-title__left">
-              <span>
-                {{
-                  selectedProductId
-                    ? selectedMeetingDay
-                      ? `${selectedMeetingDay.meeting_date}的會議記錄`
-                      : '會議文件'
-                    : '請先選擇會議'
-                }}
-              </span>
-              <button v-if="selectedProductId" type="button" class="tree-day-delete" :disabled="!selectedDayId"
-                @click="handleDeleteDay(selectedMeetingDay)">
-                刪除日期
-              </button>
+          <div class="panel-header">
+            <div class="panel-title panel-title--split">
+              <div class="panel-title__left">
+                <span>
+                  {{
+                    selectedProductId
+                      ? selectedMeetingDay
+                        ? `${selectedMeetingDay.meeting_date}的會議記錄`
+                        : '會議文件'
+                      : '請先選擇會議'
+                  }}
+                </span>
+                <button v-if="selectedProductId" type="button" class="tree-day-delete" :disabled="!selectedDayId"
+                  @click="handleDeleteDay(selectedMeetingDay)">
+                  刪除日期
+                </button>
+              </div>
             </div>
           </div>
-          <div v-if="filesLoading" class="state-card">文件載入中...</div>
-          <div v-else-if="filesError" class="state-card state-card--error">{{ filesError }}</div>
-          <div v-else-if="files.length === 0" class="state-card">目前沒有文件。</div>
-          <div v-else class="files-table">
-            <div class="files-row files-row--header">
-              <div>文件名稱</div>
-              <div>類型</div>
-              <div>大小</div>
-              <div>建立時間</div>
-              <div>下載</div>
-              <div>刪除</div>
-            </div>
-            <div v-for="file in files" :key="file.filename" class="files-row">
-              <button type="button" class="file-name file-name--button" @click="handleOpenPreview(file)">
-                {{ file.filename }}
-              </button>
-              <div>{{ file.file_type }}</div>
-              <div>{{ formatFileSize(file.file_size) }}</div>
-              <div>{{ new Date(file.created_at).toLocaleString() }}</div>
-              <div>
-                <a class="download-link" :href="downloadUrl(file.filename)">下載</a>
+          <div class="panel-body">
+            <div v-if="filesLoading" class="state-card">文件載入中...</div>
+            <div v-else-if="filesError" class="state-card state-card--error">{{ filesError }}</div>
+            <div v-else-if="files.length === 0" class="state-card">目前沒有文件。</div>
+            <div v-else class="files-table">
+              <div class="files-row files-row--header">
+                <div>文件名稱</div>
+                <div>類型</div>
+                <div>大小</div>
+                <div>建立時間</div>
+                <div>下載</div>
+                <div>刪除</div>
               </div>
-              <div>
-                <button class="delete-link" type="button" @click="handleDeleteFile(file)">
-                  刪除
+              <div v-for="file in files" :key="file.filename" class="files-row">
+                <button type="button" class="file-name file-name--button" @click="handleOpenPreview(file)">
+                  {{ file.filename }}
                 </button>
+                <div>{{ file.file_type }}</div>
+                <div>{{ formatFileSize(file.file_size) }}</div>
+                <div>{{ new Date(file.created_at).toLocaleString() }}</div>
+                <div>
+                  <a class="download-link" :href="downloadUrl(file.filename)">下載</a>
+                </div>
+                <div>
+                  <button class="delete-link" type="button" @click="handleDeleteFile(file)">
+                    刪除
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </main>
 
         <aside class="preview-panel">
-          <FilePreviewPane
-            :title="selectedFile?.name || ''"
-            :type="selectedFile?.type || 'text'"
-            :url="previewUrl"
-            :content="previewContent"
-            :loading="previewLoading"
-            :error="previewError"
-            :empty="!selectedFile"
-          />
+          <div class="panel-body">
+            <FilePreviewPane
+              class="preview-panel__pane"
+              :title="selectedFile?.name || ''"
+              :type="selectedFile?.type || 'text'"
+              :url="previewUrl"
+              :content="previewContent"
+              :loading="previewLoading"
+              :error="previewError"
+              :empty="!selectedFile"
+            />
+          </div>
         </aside>
       </div>
     </div>
@@ -604,16 +618,20 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .meeting-records {
-  min-height: 100vh;
+  height: calc(var(--app-vh, 1vh) * 100);
   background: #f8fafc;
   color: #0f172a;
   display: flex;
+  overflow: hidden;
 }
 
 .content {
   flex: 1;
   padding: 2rem 2.5rem 3rem;
   width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .page-header {
@@ -621,6 +639,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 2rem;
   margin-bottom: 2rem;
+  flex: 0 0 auto;
 }
 
 .page-header h1 {
@@ -655,6 +674,8 @@ onBeforeUnmount(() => {
   grid-template-columns: 320px minmax(360px, 1fr) minmax(360px, 1fr);
   gap: 1.5rem;
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .tree-panel,
@@ -667,6 +688,26 @@ onBeforeUnmount(() => {
   min-height: 520px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-header {
+  flex: 0 0 auto;
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.preview-panel__pane {
+  flex: 1;
+  min-height: 0;
 }
 
 .panel-title {
