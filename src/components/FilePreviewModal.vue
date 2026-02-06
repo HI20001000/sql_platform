@@ -8,11 +8,13 @@
       </div>
       <div class="preview-modal__body">
         <div v-if="loading" class="preview-modal__state">載入中...</div>
-        <div v-else-if="error" class="preview-modal__state preview-modal__state--error">{{ error }}</div>
+        <div v-else-if="displayError" class="preview-modal__state preview-modal__state--error">
+          {{ displayError }}
+        </div>
         <iframe
           v-else-if="type === 'pdf'"
           class="preview-modal__frame"
-          :src="url"
+          :src="pdfSrc"
           title="file-preview"
         ></iframe>
         <div v-else-if="type === 'docx'" ref="docxContainer" class="preview-modal__docx"></div>
@@ -28,7 +30,7 @@
 
 <script setup>
 import { renderAsync } from 'docx-preview'
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps({
   open: {
@@ -71,22 +73,79 @@ const handleClose = () => {
   emit('close')
 }
 
-const docxContainer = ref(null)
+const internalError = ref('')
+const displayError = computed(() => props.error || internalError.value)
 
-const renderDocx = async () => {
-  if (!docxContainer.value || !props.buffer) return
+const docxContainer = ref(null)
+const pdfSrc = ref('')
+let pdfObjectUrl = ''
+
+const clearPdfObjectUrl = () => {
+  if (pdfObjectUrl) {
+    URL.revokeObjectURL(pdfObjectUrl)
+    pdfObjectUrl = ''
+  }
+  pdfSrc.value = ''
+}
+
+const loadPdf = async () => {
+  if (!props.url) return
+  const response = await fetch(props.url)
+  if (!response.ok) {
+    throw new Error('PDF 載入失敗')
+  }
+  const blob = await response.blob()
+  pdfObjectUrl = URL.createObjectURL(blob)
+  pdfSrc.value = `${pdfObjectUrl}#toolbar=0`
+}
+
+const resolveDocxBuffer = async () => {
+  if (props.buffer) return props.buffer
+  if (!props.url) return null
+  const response = await fetch(props.url)
+  if (!response.ok) {
+    throw new Error('文件載入失敗')
+  }
+  return await response.arrayBuffer()
+}
+
+const renderDocx = async (buffer) => {
+  if (!docxContainer.value || !buffer) return
   await nextTick()
   docxContainer.value.innerHTML = ''
-  await renderAsync(props.buffer, docxContainer.value, undefined, {
+  await renderAsync(buffer, docxContainer.value, undefined, {
     inWrapper: true,
   })
 }
 
 watch(
-  () => [props.open, props.type, props.buffer, props.loading],
-  async ([open, type, buffer, loading]) => {
-    if (!open || type !== 'docx' || !buffer || loading) return
-    await renderDocx()
+  () => [props.open, props.type, props.url, props.loading],
+  async ([open, type, url, loading]) => {
+    if (!open || type !== 'pdf' || !url || loading) {
+      clearPdfObjectUrl()
+      return
+    }
+    try {
+      internalError.value = ''
+      clearPdfObjectUrl()
+      await loadPdf()
+    } catch (error) {
+      internalError.value = error?.message || 'PDF 載入失敗'
+    }
+  }
+)
+
+watch(
+  () => [props.open, props.type, props.buffer, props.url, props.loading],
+  async ([open, type, buffer, url, loading]) => {
+    if (!open || type !== 'docx' || loading) return
+    try {
+      internalError.value = ''
+      const resolvedBuffer = buffer || (url ? await resolveDocxBuffer() : null)
+      await renderDocx(resolvedBuffer)
+    } catch (error) {
+      internalError.value = error?.message || '文件載入失敗'
+    }
   }
 )
 
@@ -94,6 +153,7 @@ onBeforeUnmount(() => {
   if (docxContainer.value) {
     docxContainer.value.innerHTML = ''
   }
+  clearPdfObjectUrl()
 })
 </script>
 
@@ -176,12 +236,23 @@ onBeforeUnmount(() => {
 
 .preview-modal__docx :deep(.docx-wrapper) {
   padding: 0;
+  background: #ffffff;
 }
 
 .preview-modal__docx :deep(.docx) {
   color: #0f172a;
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   line-height: 1.6;
+}
+
+.preview-modal__docx :deep(.docx-body) {
+  margin: 0;
+}
+
+.preview-modal__docx :deep(.docx-page) {
+  margin: 0 auto 1.5rem;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  background: #ffffff;
 }
 
 .preview-modal__docx {
