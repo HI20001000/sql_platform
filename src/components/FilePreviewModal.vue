@@ -7,20 +7,14 @@
         <button type="button" class="preview-modal__close" @click="handleClose">✕</button>
       </div>
       <div class="preview-modal__body">
-        <div v-if="loading" class="preview-modal__state">載入中...</div>
+        <div v-if="displayLoading" class="preview-modal__state">載入中...</div>
         <div v-else-if="displayError" class="preview-modal__state preview-modal__state--error">
           {{ displayError }}
         </div>
-        <iframe
-          v-else-if="type === 'pdf'"
-          class="preview-modal__frame"
-          :src="pdfSrc"
-          sandbox="allow-same-origin"
-          title="file-preview"
-        ></iframe>
-        <pre v-else-if="type === 'docx'" class="preview-modal__content">{{ content }}</pre>
-        <div v-else-if="type === 'html'" class="preview-modal__html" v-html="content"></div>
-        <pre v-else class="preview-modal__content">{{ content }}</pre>
+        <div v-else-if="type === 'pdf'" ref="pdfContainer" class="preview-modal__pdf"></div>
+        <div v-else-if="type === 'docx'" class="preview-modal__docx" v-html="docxHtml"></div>
+        <div v-else-if="type === 'html'" class="preview-modal__html" v-html="htmlContent"></div>
+        <pre v-else class="preview-modal__content">{{ textContent }}</pre>
       </div>
       <div class="preview-modal__actions">
         <button type="button" class="preview-modal__confirm" @click="handleClose">關閉</button>
@@ -30,7 +24,14 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf'
+import mammoth from 'mammoth'
+
+GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString()
 
 const props = defineProps({
   open: {
@@ -41,17 +42,13 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  content: {
+  url: {
     type: String,
     default: '',
   },
   type: {
     type: String,
     default: 'text',
-  },
-  url: {
-    type: String,
-    default: '',
   },
   loading: {
     type: Boolean,
@@ -69,50 +66,168 @@ const handleClose = () => {
   emit('close')
 }
 
+const internalLoading = ref(false)
 const internalError = ref('')
+const textContent = ref('')
+const htmlContent = ref('')
+const docxHtml = ref('')
+const pdfContainer = ref(null)
+let pdfLoadingTask = null
+let pdfDocument = null
+
+const displayLoading = computed(() => props.loading || internalLoading.value)
 const displayError = computed(() => props.error || internalError.value)
 
-const pdfSrc = ref('')
-let pdfObjectUrl = ''
+const resetContent = () => {
+  textContent.value = ''
+  htmlContent.value = ''
+  docxHtml.value = ''
+}
 
-const clearPdfObjectUrl = () => {
-  if (pdfObjectUrl) {
-    URL.revokeObjectURL(pdfObjectUrl)
-    pdfObjectUrl = ''
+const clearPdf = () => {
+  if (pdfLoadingTask) {
+    pdfLoadingTask.destroy()
+    pdfLoadingTask = null
   }
-  pdfSrc.value = ''
+  if (pdfDocument) {
+    pdfDocument.destroy?.()
+    pdfDocument = null
+  }
+  if (pdfContainer.value) {
+    pdfContainer.value.innerHTML = ''
+  }
+}
+
+const ensurePdfContainer = async () => {
+  await nextTick()
+  if (!pdfContainer.value) {
+    throw new Error('PDF 容器不存在')
+  }
 }
 
 const loadPdf = async () => {
   if (!props.url) return
+  internalLoading.value = true
+  internalError.value = ''
+  clearPdf()
+  await ensurePdfContainer()
+
   const response = await fetch(props.url)
   if (!response.ok) {
     throw new Error('PDF 載入失敗')
   }
-  const blob = await response.blob()
-  pdfObjectUrl = URL.createObjectURL(blob)
-  pdfSrc.value = `${pdfObjectUrl}#toolbar=0`
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('application/pdf')) {
+    throw new Error('非 PDF 檔案，無法預覽')
+  }
+  const buffer = await response.arrayBuffer()
+  pdfLoadingTask = getDocument({ data: buffer })
+  pdfDocument = await pdfLoadingTask.promise
+
+  for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+    const page = await pdfDocument.getPage(pageNumber)
+    const viewport = page.getViewport({ scale: 1.2 })
+    const canvas = document.createElement('canvas')
+    const context = canvas.getContext('2d')
+    canvas.width = viewport.width
+    canvas.height = viewport.height
+    canvas.className = 'preview-modal__pdf-canvas'
+    pdfContainer.value.appendChild(canvas)
+    await page.render({ canvasContext: context, viewport }).promise
+  }
+}
+
+const loadDocx = async () => {
+  if (!props.url) return
+  internalLoading.value = true
+  internalError.value = ''
+  docxHtml.value = ''
+
+  const response = await fetch(props.url)
+  if (!response.ok) {
+    throw new Error('DOCX 載入失敗')
+  }
+  const buffer = await response.arrayBuffer()
+  const { value } = await mammoth.convertToHtml({ arrayBuffer: buffer })
+  docxHtml.value = value || ''
+}
+
+const loadText = async () => {
+  if (!props.url) return
+  internalLoading.value = true
+  internalError.value = ''
+  textContent.value = ''
+
+  const response = await fetch(props.url)
+  if (!response.ok) {
+    throw new Error('文件載入失敗')
+  }
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('text') && !contentType.includes('json')) {
+    textContent.value = '此檔案格式不支援預覽，請下載後查看。'
+    return
+  }
+  textContent.value = await response.text()
+}
+
+const loadHtml = async () => {
+  if (!props.url) return
+  internalLoading.value = true
+  internalError.value = ''
+  htmlContent.value = ''
+
+  const response = await fetch(props.url)
+  if (!response.ok) {
+    throw new Error('文件載入失敗')
+  }
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('text/html')) {
+    throw new Error('非 HTML 檔案，無法預覽')
+  }
+  htmlContent.value = await response.text()
+}
+
+const loadPreview = async () => {
+  resetContent()
+  clearPdf()
+  if (!props.open || !props.url) {
+    internalLoading.value = false
+    return
+  }
+
+  try {
+    if (props.type === 'pdf') {
+      await loadPdf()
+    } else if (props.type === 'docx') {
+      await loadDocx()
+    } else if (props.type === 'html') {
+      await loadHtml()
+    } else {
+      await loadText()
+    }
+  } catch (error) {
+    internalError.value = error?.message || '文件載入失敗'
+  } finally {
+    internalLoading.value = false
+  }
 }
 
 watch(
-  () => [props.open, props.type, props.url, props.loading],
-  async ([open, type, url, loading]) => {
-    if (!open || type !== 'pdf' || !url || loading) {
-      clearPdfObjectUrl()
+  () => [props.open, props.type, props.url],
+  async ([open]) => {
+    if (!open) {
+      internalLoading.value = false
+      internalError.value = ''
+      resetContent()
+      clearPdf()
       return
     }
-    try {
-      internalError.value = ''
-      clearPdfObjectUrl()
-      await loadPdf()
-    } catch (error) {
-      internalError.value = error?.message || 'PDF 載入失敗'
-    }
+    await loadPreview()
   }
 )
 
 onBeforeUnmount(() => {
-  clearPdfObjectUrl()
+  clearPdf()
 })
 </script>
 
@@ -187,29 +302,50 @@ onBeforeUnmount(() => {
   color: #0f172a;
 }
 
-.preview-modal__frame {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
 .preview-modal__html {
   color: #0f172a;
   line-height: 1.6;
 }
 
-.preview-modal__actions {
+.preview-modal__pdf {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.preview-modal__confirm {
-  border: none;
-  background: #2563eb;
-  color: #ffffff;
-  border-radius: 10px;
-  padding: 0.45rem 0.9rem;
-  cursor: pointer;
-  font-weight: 600;
+.preview-modal__pdf :deep(.preview-modal__pdf-canvas) {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.preview-modal__docx {
+  font-family: 'Inter', 'Noto Sans TC', system-ui, sans-serif;
+  color: #0f172a;
+  line-height: 1.7;
+}
+
+.preview-modal__docx :deep(p) {
+  margin: 0 0 0.9rem;
+}
+
+.preview-modal__docx :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.preview-modal__docx :deep(th),
+.preview-modal__docx :deep(td) {
+  border: 1px solid #e2e8f0;
+  padding: 0.4rem 0.6rem;
+}
+
+.preview-modal__docx :deep(ul),
+.preview-modal__docx :deep(ol) {
+  padding-left: 1.2rem;
+  margin: 0 0 0.9rem;
 }
 </style>
