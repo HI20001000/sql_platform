@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
+import FilePreviewModal from '../components/FilePreviewModal.vue'
 import NoticeModal from '../components/NoticeModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
 import {
@@ -34,6 +35,11 @@ const modalTitle = ref('')
 const modalMessage = ref('')
 const modalSuccessItems = ref([])
 const modalErrorItems = ref([])
+const previewOpen = ref(false)
+const previewTitle = ref('')
+const previewContent = ref('')
+const previewLoading = ref(false)
+const previewError = ref('')
 
 const getCurrentUser = () => {
   try {
@@ -311,6 +317,35 @@ const handleCloseModal = () => {
   modalOpen.value = false
 }
 
+const handleOpenPreview = async (file) => {
+  if (!file?.filename || !selectedDayId.value) return
+  previewTitle.value = file.filename
+  previewContent.value = ''
+  previewError.value = ''
+  previewLoading.value = true
+  previewOpen.value = true
+  try {
+    const response = await fetch(downloadUrl(file.filename))
+    if (!response.ok) {
+      throw new Error('文件載入失敗')
+    }
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('text') && !contentType.includes('json')) {
+      previewContent.value = '此檔案格式不支援預覽，請下載後查看。'
+    } else {
+      previewContent.value = await response.text()
+    }
+  } catch (error) {
+    previewError.value = error?.message || '文件載入失敗'
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+const handleClosePreview = () => {
+  previewOpen.value = false
+}
+
 const formatFileSize = (bytes) => {
   if (!bytes) return '-'
   if (bytes < 1024) return `${bytes} B`
@@ -339,6 +374,14 @@ onMounted(() => {
       :success-items="modalSuccessItems"
       :error-items="modalErrorItems"
       @close="handleCloseModal"
+    />
+    <FilePreviewModal
+      :open="previewOpen"
+      :title="previewTitle"
+      :content="previewContent"
+      :loading="previewLoading"
+      :error="previewError"
+      @close="handleClosePreview"
     />
     <div class="content">
       <header class="page-header">
@@ -451,7 +494,9 @@ onMounted(() => {
               <div>刪除</div>
             </div>
             <div v-for="file in files" :key="file.filename" class="files-row">
-              <div class="file-name">{{ file.filename }}</div>
+              <button type="button" class="file-name file-name--button" @click="handleOpenPreview(file)">
+                {{ file.filename }}
+              </button>
               <div>{{ file.file_type }}</div>
               <div>{{ formatFileSize(file.file_size) }}</div>
               <div>{{ new Date(file.created_at).toLocaleString() }}</div>
@@ -734,6 +779,19 @@ onMounted(() => {
 
 .file-name {
   word-break: break-all;
+}
+
+.file-name--button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0;
+  color: #2563eb;
+  cursor: pointer;
+}
+
+.file-name--button:hover {
+  text-decoration: underline;
 }
 
 .download-link {
