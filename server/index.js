@@ -24,6 +24,7 @@ import {
   updateTaskFields,
 } from '../src/scripts/CreateProject/index.js'
 import { createMeetingHandlers } from './scripts/CreateMeeting/index.js'
+import { createLlmHandlers } from './scripts/llm/index.js'
 let createLogger = null
 let createSqlAuditWrapper = null
 let mysql = null
@@ -114,6 +115,13 @@ const meetingHandlers = createMeetingHandlers({
   parseBody,
   logger,
   meetingRootPath: MEETING_ROOT_PATH,
+})
+
+
+const llmHandlers = createLlmHandlers({
+  sendJson,
+  parseBody,
+  logger,
 })
 
 const createConnection = async (withDatabase = false) => {
@@ -789,6 +797,11 @@ const start = async () => {
       ['DELETE'].includes(req.method)
     ) {
       await meetingHandlers.deleteMeetingFile(req, res)
+      return
+    }
+
+    if (url.pathname === '/api/llm/meeting-summary' && req.method === 'POST') {
+      await llmHandlers.summarizeMeetingRecords(req, res)
       return
     }
     if (url.pathname === '/api/users' && req.method === 'GET') {

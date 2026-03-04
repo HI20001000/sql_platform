@@ -102,11 +102,17 @@ const resolveStatus = (statusId) => {
 }
 
 const resolvedAssignees = computed(() => {
-  return props.steps.map((step) => ({
-    ...step,
-    assigneeLabel: resolveAssigneeLabel(step.assignee_user_id),
-    statusMeta: resolveStatus(step.status_id),
-  }))
+  return [...props.steps]
+    .sort((a, b) => {
+      const timeA = new Date(a?.created_at || 0).getTime() || 0
+      const timeB = new Date(b?.created_at || 0).getTime() || 0
+      return timeB - timeA
+    })
+    .map((step) => ({
+      ...step,
+      assigneeLabel: resolveAssigneeLabel(step.assignee_user_id),
+      statusMeta: resolveStatus(step.status_id),
+    }))
 })
 </script>
 
