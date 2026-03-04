@@ -24,6 +24,7 @@ import {
   updateTaskFields,
 } from '../src/scripts/CreateProject/index.js'
 import { createMeetingHandlers } from './scripts/CreateMeeting/index.js'
+import { createDifyHandlers } from './scripts/dify/index.js'
 let createLogger = null
 let createSqlAuditWrapper = null
 let mysql = null
@@ -114,6 +115,13 @@ const meetingHandlers = createMeetingHandlers({
   parseBody,
   logger,
   meetingRootPath: MEETING_ROOT_PATH,
+})
+
+
+const difyHandlers = createDifyHandlers({
+  sendJson,
+  parseBody,
+  logger,
 })
 
 const createConnection = async (withDatabase = false) => {
@@ -789,6 +797,11 @@ const start = async () => {
       ['DELETE'].includes(req.method)
     ) {
       await meetingHandlers.deleteMeetingFile(req, res)
+      return
+    }
+
+    if (url.pathname === '/api/dify/meeting-summary' && req.method === 'POST') {
+      await difyHandlers.summarizeMeetingRecords(req, res)
       return
     }
     if (url.pathname === '/api/users' && req.method === 'GET') {

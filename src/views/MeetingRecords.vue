@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import mammoth from 'mammoth'
+import * as pdfjsLib from 'pdfjs-dist'
 import FilePreviewPane from '../components/FilePreviewPane.vue'
 import NoticeModal from '../components/NoticeModal.vue'
 import Toolbar from '../components/toolbar/Toolbar.vue'
@@ -15,6 +16,8 @@ import {
   renameMeetingDay,
   uploadMeetingFiles,
 } from '../scripts/Meetings/api.js'
+import { summarizeMeetingRecords } from '../scripts/dify/api.js'
+import { buildSummaryDocxFile } from '../scripts/dify/docx.js'
 
 const tree = ref([])
 // NEW: collapse state for project/product levels
@@ -34,6 +37,7 @@ const renameDate = ref('')
 const renameInputRefs = new Map()
 const createInputRefs = new Map()
 const uploading = ref(false)
+const summarizing = ref(false)
 const uploadError = ref('')
 const modalOpen = ref(false)
 const modalTitle = ref('')
@@ -412,6 +416,97 @@ const handleUpload = async (event) => {
   }
 }
 
+
+const extractTextFromPdf = async (arrayBuffer) => {
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true }).promise
+  const pages = []
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber)
+    const content = await page.getTextContent()
+    const text = content.items.map((item) => item.str || '').join(' ')
+    pages.push(text.trim())
+  }
+  return pages.join('\n\n').trim()
+}
+
+const readMeetingFileContent = async (file) => {
+  const url = downloadUrl(file.filename)
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`無法讀取檔案：${file.filename}`)
+  }
+
+  const lowerName = file.filename.toLowerCase()
+
+  if (lowerName.endsWith('.docx')) {
+    const buffer = await response.arrayBuffer()
+    const { value } = await mammoth.extractRawText({ arrayBuffer: buffer })
+    return value || ''
+  }
+
+  if (lowerName.endsWith('.pdf')) {
+    const buffer = await response.arrayBuffer()
+    return extractTextFromPdf(buffer)
+  }
+
+  return response.text()
+}
+
+const buildSummaryFilename = () => {
+  const meetingDateLabel = selectedMeetingDay.value?.meeting_date || 'unknown-date'
+  return `${meetingDateLabel}-會議總結.docx`
+}
+
+const handleSummarizeWithDify = async () => {
+  if (!selectedDayId.value || !files.value.length) return
+
+  summarizing.value = true
+  try {
+    const records = await Promise.all(
+      files.value.map(async (file) => ({
+        filename: file.filename,
+        fileType: file.file_type,
+        content: await readMeetingFileContent(file),
+      }))
+    )
+
+    const user = getCurrentUser()
+    const result = await summarizeMeetingRecords({
+      meetingDayId: selectedDayId.value,
+      meetingDate: selectedMeetingDay.value?.meeting_date,
+      productName: selectedProduct.value?.name,
+      records,
+      user: user?.username || user?.mail || 'system',
+    })
+
+    const summaryFile = await buildSummaryDocxFile({
+      filename: buildSummaryFilename(),
+      content: result.summary,
+    })
+
+    await uploadMeetingFiles({
+      meetingDayId: selectedDayId.value,
+      files: [summaryFile],
+      uploadedBy: user?.username || user?.mail || 'system',
+    })
+
+    await loadFiles()
+    modalTitle.value = 'Dify 總結完成'
+    modalMessage.value = '已產生會議總結並儲存為 DOCX。'
+    modalSuccessItems.value = [summaryFile.name]
+    modalErrorItems.value = []
+    modalOpen.value = true
+  } catch (error) {
+    modalTitle.value = 'Dify 總結失敗'
+    modalMessage.value = error?.message || '請稍後再試'
+    modalSuccessItems.value = []
+    modalErrorItems.value = []
+    modalOpen.value = true
+  } finally {
+    summarizing.value = false
+  }
+}
+
 const handleCloseModal = () => {
   modalOpen.value = false
 }
@@ -702,6 +797,15 @@ onBeforeUnmount(() => {
                       : '請先選擇會議'
                   }}
                 </span>
+                <button
+                  v-if="selectedProductId"
+                  type="button"
+                  class="dify-summary-btn"
+                  :disabled="!selectedDayId || filesLoading || files.length === 0 || summarizing"
+                  @click="handleSummarizeWithDify"
+                >
+                  {{ summarizing ? 'Dify 產生中...' : 'Dify 總結' }}
+                </button>
                 <button v-if="selectedProductId" type="button" class="tree-day-delete" :disabled="!selectedDayId"
                   @click="handleDeleteDay(selectedMeetingDay)">
                   刪除日期
@@ -1044,6 +1148,23 @@ onBeforeUnmount(() => {
   background: #eff6ff;
   color: #1d4ed8;
   border-color: #93c5fd;
+}
+
+
+.dify-summary-btn {
+  border: 1px solid #2563eb;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dify-summary-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .tree-day-delete {

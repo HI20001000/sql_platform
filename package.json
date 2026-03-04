@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "docx": "^9.6.0",
     "docx-preview": "^0.3.7",
     "mammoth": "^1.7.1",
     "mysql2": "^3.16.3",
