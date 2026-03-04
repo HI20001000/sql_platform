@@ -452,13 +452,20 @@ const readMeetingFileContent = async (file) => {
   return response.text()
 }
 
-const buildSummaryFilename = () => {
-  const meetingDateLabel = selectedMeetingDay.value?.meeting_date || 'unknown-date'
-  return `${meetingDateLabel}-會議總結.docx`
-}
+const buildSummaryFilename = () => '會議總結.docx'
 
 const handleSummarizeWithLlm = async () => {
   if (!selectedDayId.value || !files.value.length) return
+
+  const hasSummaryDocx = files.value.some((file) => file.filename === '會議總結.docx')
+  if (hasSummaryDocx) {
+    modalTitle.value = '無法生成會議總結'
+    modalMessage.value = '目前資料夾已存在「會議總結.docx」，請先刪除原有會議總結後再重新生成。'
+    modalSuccessItems.value = []
+    modalErrorItems.value = ['會議總結.docx']
+    modalOpen.value = true
+    return
+  }
 
   summarizing.value = true
   try {
