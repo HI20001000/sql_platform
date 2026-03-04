@@ -24,7 +24,7 @@ import {
   updateTaskFields,
 } from '../src/scripts/CreateProject/index.js'
 import { createMeetingHandlers } from './scripts/CreateMeeting/index.js'
-import { createDifyHandlers } from './scripts/dify/index.js'
+import { createLlmHandlers } from './scripts/llm/index.js'
 let createLogger = null
 let createSqlAuditWrapper = null
 let mysql = null
@@ -118,7 +118,7 @@ const meetingHandlers = createMeetingHandlers({
 })
 
 
-const difyHandlers = createDifyHandlers({
+const llmHandlers = createLlmHandlers({
   sendJson,
   parseBody,
   logger,
@@ -800,8 +800,8 @@ const start = async () => {
       return
     }
 
-    if (url.pathname === '/api/dify/meeting-summary' && req.method === 'POST') {
-      await difyHandlers.summarizeMeetingRecords(req, res)
+    if (url.pathname === '/api/llm/meeting-summary' && req.method === 'POST') {
+      await llmHandlers.summarizeMeetingRecords(req, res)
       return
     }
     if (url.pathname === '/api/users' && req.method === 'GET') {

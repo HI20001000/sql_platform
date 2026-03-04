@@ -16,8 +16,8 @@ import {
   renameMeetingDay,
   uploadMeetingFiles,
 } from '../scripts/Meetings/api.js'
-import { summarizeMeetingRecords } from '../scripts/dify/api.js'
-import { buildSummaryDocxFile } from '../scripts/dify/docx.js'
+import { summarizeMeetingRecords } from '../scripts/llm/api.js'
+import { buildSummaryDocxFile } from '../scripts/llm/docx.js'
 
 const tree = ref([])
 // NEW: collapse state for project/product levels
@@ -457,7 +457,7 @@ const buildSummaryFilename = () => {
   return `${meetingDateLabel}-會議總結.docx`
 }
 
-const handleSummarizeWithDify = async () => {
+const handleSummarizeWithLlm = async () => {
   if (!selectedDayId.value || !files.value.length) return
 
   summarizing.value = true
@@ -491,13 +491,13 @@ const handleSummarizeWithDify = async () => {
     })
 
     await loadFiles()
-    modalTitle.value = 'Dify 總結完成'
+    modalTitle.value = 'LLM 總結完成'
     modalMessage.value = '已產生會議總結並儲存為 DOCX。'
     modalSuccessItems.value = [summaryFile.name]
     modalErrorItems.value = []
     modalOpen.value = true
   } catch (error) {
-    modalTitle.value = 'Dify 總結失敗'
+    modalTitle.value = 'LLM 總結失敗'
     modalMessage.value = error?.message || '請稍後再試'
     modalSuccessItems.value = []
     modalErrorItems.value = []
@@ -800,11 +800,11 @@ onBeforeUnmount(() => {
                 <button
                   v-if="selectedProductId"
                   type="button"
-                  class="dify-summary-btn"
+                  class="llm-summary-btn"
                   :disabled="!selectedDayId || filesLoading || files.length === 0 || summarizing"
-                  @click="handleSummarizeWithDify"
+                  @click="handleSummarizeWithLlm"
                 >
-                  {{ summarizing ? 'Dify 產生中...' : 'Dify 總結' }}
+                  {{ summarizing ? 'LLM 產生中...' : 'LLM 總結' }}
                 </button>
                 <button v-if="selectedProductId" type="button" class="tree-day-delete" :disabled="!selectedDayId"
                   @click="handleDeleteDay(selectedMeetingDay)">
@@ -1151,7 +1151,7 @@ onBeforeUnmount(() => {
 }
 
 
-.dify-summary-btn {
+.llm-summary-btn {
   border: 1px solid #2563eb;
   border-radius: 999px;
   background: #2563eb;
@@ -1162,7 +1162,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.dify-summary-btn:disabled {
+.llm-summary-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
